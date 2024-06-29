@@ -1,0 +1,12 @@
+[package]
+name = "arcos-api-rerewritten"
+version = "0.0.1"
+edition = "2021"
+
+[dependencies]
+diesel = { version = "2.2.1", features = ["sqlite", "serde_json", "r2d2", "chrono"] }
+serde = "1.0.203"
+serde_json = "1.0.118"
+dotenvy = "0.15.7"
+r2d2 = "0.8.10"
+chrono = "0.4.38"
