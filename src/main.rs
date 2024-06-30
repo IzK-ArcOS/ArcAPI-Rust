@@ -6,7 +6,7 @@ mod routers;
 async fn main() {
     // todo logger
     
-    dotenvy::dotenv().expect(".env file should a valid env vars file");
+    dotenvy::dotenv().expect(".env file should be a valid env vars file");
     
     let conn_pool = db::create_db_connection_pool();
     
