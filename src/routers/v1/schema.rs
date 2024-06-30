@@ -49,7 +49,7 @@ impl TryFrom<db::User> for PartialUser {
             return Err(ConversionError::ItemIsDeleted);
         };
         
-        match u.get_properties_as_json().expect("user is not deleted") {
+        match u.map_properties_as_json().expect("user is not deleted") {
             Err(_) => Err(ConversionError::ItemIsCorrupted(false)),
             Ok(mut json_prop) =>
                 Ok(Self {

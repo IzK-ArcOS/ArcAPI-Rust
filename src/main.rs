@@ -2,6 +2,12 @@ mod db;
 mod routers;
 
 
+#[derive(Debug, Clone)]
+struct AppState {
+    pub conn_pool: db::ConnPool
+}
+
+
 #[tokio::main]
 async fn main() {
     // todo logger
@@ -15,7 +21,7 @@ async fn main() {
     let app = axum::Router::new()
         .nest("/", routers::v1::get_router())
         // .nest("/v2", routers::v2::get_router())  // fixme uncomment once implemented
-        .with_state(conn_pool);
+        .with_state(AppState { conn_pool });
 
     // todo server address config
     let listener = tokio::net::TcpListener::bind("0.0.0.0:3333").await.unwrap();

@@ -1,11 +1,11 @@
 mod schema;
-pub mod users;
-pub mod tokens;
-pub mod messages;
 mod functions;
+mod models;
 
 
-pub use users::User;
+pub use models::users::User;
+pub use models::tokens::Token;
+pub use models::messages::Message;
 
 
 use diesel::sqlite::SqliteConnection;

@@ -14,7 +14,7 @@ diesel::table! {
 diesel::table! {
     tokens (value) {
         value -> Text,
-        owner_id -> Nullable<Integer>,
+        owner_id -> Integer,
         lifetime -> Nullable<Float>,
         creation_time -> Timestamp,
     }

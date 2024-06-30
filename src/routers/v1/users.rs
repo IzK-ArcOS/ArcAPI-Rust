@@ -1,16 +1,16 @@
 use axum::extract::State;
 use axum::routing::get;
-use crate::db;
+use crate::{AppState, db};
 use super::schema::{DataResponse, PartialUser};
 
-pub fn get_router() -> axum::Router<db::ConnPool> {
+pub fn get_router() -> axum::Router<AppState> {
     axum::Router::new()
         .route("/get", get(get_all_users))
 }
 
 
 async fn get_all_users(
-    State(conn_pool): State<db::ConnPool>
+    State(AppState { conn_pool }): State<AppState>
 ) -> axum::Json<DataResponse<Vec<PartialUser>>> {
     let users = tokio::task::spawn_blocking(move || {
         let mut conn = conn_pool.get().unwrap();

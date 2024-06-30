@@ -13,3 +13,4 @@ r2d2 = "0.8.10"
 chrono = { version = "0.4.38", features = ["serde"] }
 tokio = { version = "1.38.0", features = ["rt-multi-thread"] }
 axum = { version = "0.7.5", features = ["macros"] }
+axum-extra = { version = "0.9.3", features = ["typed-header"] }

@@ -3,17 +3,14 @@ use diesel::{
     sql_types::Bool
 };
 use chrono::NaiveDateTime;
-use diesel::expression::AsExpression;
-use diesel::query_builder::AsQuery;
-use diesel::sqlite::Sqlite;
-use super::{
-    schema::users::dsl::*,
+use super::super::{
+    schema::{self, users::dsl::*},
     functions
 };
 
 
 #[derive(Queryable, Selectable)]
-#[diesel(table_name = super::schema::users)]
+#[diesel(table_name = schema::users)]
 #[diesel(check_for_backend(diesel::sqlite::Sqlite))]
 pub struct User {
     pub id: i32,
@@ -26,7 +23,7 @@ pub struct User {
 
 
 impl User {
-    pub fn get_properties_as_json(&self) -> Option<Result<serde_json::Value, serde_json::Error>> {
+    pub fn map_properties_as_json(&self) -> Option<Result<serde_json::Value, serde_json::Error>> {
         self.properties.as_ref().map(|prop_raw| serde_json::from_str(prop_raw))
     }
     

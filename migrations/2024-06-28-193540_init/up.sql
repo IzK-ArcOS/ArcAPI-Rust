@@ -10,7 +10,7 @@ CREATE TABLE IF NOT EXISTS users (
 
 CREATE TABLE IF NOT EXISTS tokens (
     value CHAR(36) PRIMARY KEY NOT NULL,
-    owner_id INTEGER REFERENCES users(id),
+    owner_id INTEGER REFERENCES users(id) NOT NULL,
     lifetime FLOAT NULL,
     creation_time DATETIME NOT NULL
 );
