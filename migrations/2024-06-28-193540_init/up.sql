@@ -1,4 +1,4 @@
-CREATE TABLE users (
+CREATE TABLE IF NOT EXISTS users (
     id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
     username VARCHAR(25) NULL,
     hashed_password CHAR(128) NULL,
@@ -8,7 +8,7 @@ CREATE TABLE users (
 );
 
 
-CREATE TABLE tokens (
+CREATE TABLE IF NOT EXISTS tokens (
     value CHAR(36) PRIMARY KEY NOT NULL,
     owner_id INTEGER REFERENCES users(id),
     lifetime FLOAT NULL,
@@ -16,7 +16,7 @@ CREATE TABLE tokens (
 );
 
 
-CREATE TABLE messages (
+CREATE TABLE IF NOT EXISTS messages (
     id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
     sender_id INTEGER REFERENCES users(id) NOT NULL,
     receiver_id INTEGER REFERENCES users(id) NOT NULL,

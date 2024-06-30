@@ -1,7 +1,8 @@
-pub mod schema;
+mod schema;
 pub mod users;
 pub mod tokens;
 pub mod messages;
+mod functions;
 
 
 pub use users::User;
@@ -11,6 +12,7 @@ use diesel::sqlite::SqliteConnection;
 use std::env;
 use diesel::connection::SimpleConnection;
 use diesel::r2d2::{Pool, ConnectionManager};
+use diesel_migrations::{embed_migrations, EmbeddedMigrations, MigrationHarness};
 
 
 // *technically* adapted from https://stackoverflow.com/a/57717533
@@ -49,4 +51,12 @@ pub fn create_db_connection_pool() -> ConnPool {
         .connection_customizer(Box::new(CustomConnectionOptions()))
         .build(ConnectionManager::<SqliteConnection>::new(database_url))
         .unwrap()
+}
+
+
+pub fn migrate(conn: &mut SqliteConnection) {
+    const MIGRATIONS: EmbeddedMigrations = embed_migrations!("migrations");
+
+    conn.run_pending_migrations(MIGRATIONS)
+        .expect("migrations should be valid");
 }

@@ -1,6 +1,15 @@
-use diesel::prelude::*;
-use super::schema::users::dsl::*;
+use diesel::{
+    prelude::*,
+    sql_types::Bool
+};
 use chrono::NaiveDateTime;
+use diesel::expression::AsExpression;
+use diesel::query_builder::AsQuery;
+use diesel::sqlite::Sqlite;
+use super::{
+    schema::users::dsl::*,
+    functions
+};
 
 
 #[derive(Queryable, Selectable)]
@@ -17,9 +26,24 @@ pub struct User {
 
 
 impl User {
+    pub fn get_properties_as_json(&self) -> Option<Result<serde_json::Value, serde_json::Error>> {
+        self.properties.as_ref().map(|prop_raw| serde_json::from_str(prop_raw))
+    }
+    
     pub fn get_all(conn: &mut SqliteConnection) -> Vec<Self> {
         users
-            .select(User::as_select())
+            .select(Self::as_select())
+            .load(conn)
+            .unwrap()
+    }
+    
+    pub fn get_all_accessible(conn: &mut SqliteConnection) -> Vec<Self> {
+        users
+            .filter(
+                is_deleted.eq(false)
+                    .and(functions::json_extract::<Bool, _, _>(properties.assume_not_null(), "$.acc.enabled").eq(true))
+            )
+            .select(Self::as_select())
             .load(conn)
             .unwrap()
     }
