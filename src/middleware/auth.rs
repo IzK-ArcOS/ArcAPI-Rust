@@ -6,7 +6,7 @@ use serde::Deserialize;
 use crate::AppState;
 
 
-const UNPROTECTED_ROUTES: &[&str] = &["/connect"];
+const UNPROTECTED_ROUTES: &[&str] = &["/connect"];  // xxx should this be configurable?
 
 
 #[derive(Debug, Deserialize)]
