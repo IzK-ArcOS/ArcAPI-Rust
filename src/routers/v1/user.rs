@@ -25,7 +25,7 @@ async fn get_self_properties(
 
 
 async fn update_self_properties(
-    State(AppState { conn_pool }): State<AppState>,
+    State(AppState { conn_pool, .. }): State<AppState>,
     SessionUser(mut user): SessionUser,
     Json(new_prop): Json<serde_json::Value>
 ) {

@@ -31,21 +31,10 @@ impl r2d2::CustomizeConnection<SqliteConnection, diesel::r2d2::Error> for Custom
 }
 
 
-const DEFAULT_MAX_CONN_POOL_SIZE: u32 = 16;
-
-
 pub type ConnPool = Pool<ConnectionManager<SqliteConnection>>;
 
 
-pub fn create_db_connection_pool() -> ConnPool {
-    let database_url = env::var("DATABASE_URL").expect("env var 'DATABASE_URL' should be set");
-    let max_pool_size = env::var("DATABASE_MAX_CONN_POOL_SIZE")
-        .map_or(
-            DEFAULT_MAX_CONN_POOL_SIZE, 
-            |s| s.parse()
-                .expect("env var 'DATABASE_MAX_CONN_POOL_SIZE' should contain a valid 32-bit unsigned integer")
-        );
-    
+pub fn create_db_connection_pool(database_url: &str, max_pool_size: u32) -> ConnPool {
     Pool::builder()
         .max_size(max_pool_size)
         .connection_customizer(Box::new(CustomConnectionOptions()))

@@ -51,7 +51,7 @@ impl FromRequestParts<AppState> for SessionToken {
 
     async fn from_request_parts(
         parts: &mut Parts,
-        AppState { conn_pool }: &AppState
+        AppState { conn_pool, .. }: &AppState
     ) -> Result<Self, Self::Rejection> {
         let token_value =
             TypedHeader::<Authorization<Bearer>>::from_request_parts(parts, &()).await

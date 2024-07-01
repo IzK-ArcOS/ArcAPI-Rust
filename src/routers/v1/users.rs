@@ -10,7 +10,7 @@ pub fn get_router() -> axum::Router<AppState> {
 
 
 async fn get_all_users(
-    State(AppState { conn_pool }): State<AppState>
+    State(AppState { conn_pool, .. }): State<AppState>
 ) -> axum::Json<DataResponse<Vec<PartialUser>>> {
     let users = tokio::task::spawn_blocking(move || {
         let mut conn = conn_pool.get().unwrap();

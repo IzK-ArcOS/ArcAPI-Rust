@@ -1,7 +1,6 @@
 use std::fmt::Formatter;
 use axum::extract::FromRequestParts;
 use axum::http::request::Parts;
-use axum::http::StatusCode;
 use axum::response::{IntoResponse, Response};
 use crate::{AppState, db};
 use crate::routers::extractors::session_token::SessionTokenRejection;

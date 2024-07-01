@@ -1,0 +1,10 @@
+# the name of the API for the API
+platform = "Rust"
+
+[server]
+port = 3333
+address = "127.0.0.1"  # set to "0.0.0.0" if you want to expose the server
+
+# you shouldn't change this if you dont know what is it
+#[database]
+#conn_pool_size = 16
