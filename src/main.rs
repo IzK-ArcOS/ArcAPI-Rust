@@ -1,6 +1,7 @@
 mod db;
 mod routers;
 mod config;
+mod middleware;
 
 
 use std::sync::Arc;
@@ -29,10 +30,12 @@ async fn main() {
     // todo remove this to string and then later from string conversion, while still supporting V4 and V6
     let addr = format!("{}:{}", config.server.address, config.server.port);
     
+    let state = AppState { conn_pool, config: Arc::new(config) };
     let app = axum::Router::new()
         .nest("/", routers::v1::get_router())
         // .nest("/v2", routers::v2::get_router())  // fixme uncomment once implemented
-        .with_state(AppState { conn_pool, config: Arc::new(config) });
+        .with_state(state.clone())
+        .route_layer(axum::middleware::from_fn_with_state(state, middleware::verify_auth_code));  // xxx should it be loaded only if ac is Some?
     
     let listener = tokio::net::TcpListener::bind(addr).await.unwrap();
     axum::serve(listener, app).await.unwrap();
