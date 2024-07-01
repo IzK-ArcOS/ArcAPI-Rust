@@ -22,6 +22,12 @@ pub struct User {
 }
 
 
+#[derive(Debug)]
+pub enum UserInteractionError {
+    UserIsDeleted
+}
+
+
 impl User {
     pub fn map_properties_as_json(&self) -> Option<Result<serde_json::Value, serde_json::Error>> {
         self.properties.as_ref().map(|prop_raw| serde_json::from_str(prop_raw))
@@ -43,5 +49,22 @@ impl User {
             .select(Self::as_select())
             .load(conn)
             .unwrap()
+    }
+    
+    pub fn set_properties(&mut self, conn: &mut SqliteConnection, new_prop: serde_json::Value) -> Result<(), UserInteractionError> {
+        if let Some(ref mut prop) = self.properties {
+            let json_new_prop = new_prop.to_string();
+
+            diesel::update(users.find(self.id))
+                .set(properties.eq(&json_new_prop))
+                .execute(conn)
+                .unwrap();
+            
+            *prop = json_new_prop;
+            
+            Ok(())
+        } else {
+            Err(UserInteractionError::UserIsDeleted)
+        }
     }
 }
