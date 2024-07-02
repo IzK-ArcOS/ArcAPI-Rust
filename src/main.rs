@@ -44,7 +44,11 @@ async fn main() {
                 .layer(axum::middleware::from_fn_with_state(state, middleware::verify_auth_code))  // xxx should it be loaded only if ac is Some?
                 .layer(tower_http::cors::CorsLayer::permissive())
         )
-        .layer(tower_http::trace::TraceLayer::new_for_http());
+        .layer(
+            tower::ServiceBuilder::new()
+                .layer(tower_http::trace::TraceLayer::new_for_http())
+                .layer(tower_http::catch_panic::CatchPanicLayer::new())
+        );
 
     let app = tower_http::normalize_path::NormalizePathLayer::trim_trailing_slash().layer(router);
 
