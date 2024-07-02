@@ -1,5 +1,9 @@
-use crate::db;
+mod meta;
+mod schema;
 
-pub fn get_router() -> axum::Router<db::ConnPool> {
-    todo!()
+use crate::AppState;
+
+pub fn get_router() -> axum::Router<AppState> {
+    axum::Router::new()
+        .nest("/", meta::get_router())
 }

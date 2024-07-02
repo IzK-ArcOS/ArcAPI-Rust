@@ -14,7 +14,7 @@ struct PartialDBConfig {
 
 #[derive(Debug, Deserialize)]
 struct PartialConfig {
-    pub platform: String,
+    pub name: String,
     pub server: ServerConfig,
     pub database: PartialDBConfig,
 }
@@ -35,7 +35,7 @@ pub struct DBConfig {
 
 #[derive(Debug)]
 pub struct Config {
-    pub platform: String,
+    pub name: String,
     pub server: ServerConfig,
     pub database: DBConfig,
     pub auth: AuthConfig,
@@ -58,7 +58,7 @@ impl Config {
             .expect(&format!("{path} should be a valid config file"));
 
         Self {
-            platform: part.platform,
+            name: part.name,
             server: part.server,
             database: DBConfig {
                 path: get_env_var(Self::DATABASE_FILE_PATH_ENV_VAR),
