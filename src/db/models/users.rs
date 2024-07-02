@@ -51,7 +51,7 @@ impl User {
     pub(super) fn hash_password(password: &str) -> String {
         hmac_sha512::Hash::hash(password).map(|b| format!("{b:0>2x}")).concat()
     }
-    
+
     pub fn create(conn: &mut SqliteConnection, username_: &str, password: &str, properties_: Option<&serde_json::Value>) -> Result<Self, UserCreationError> {
         let r = diesel::insert_into(users)
             .values(&NewUser {
@@ -62,7 +62,7 @@ impl User {
                 is_deleted: false,
             })
             .get_result(conn);
-        
+
         match r {
             Ok(r) => Ok(r),
             Err(diesel::result::Error::DatabaseError(DatabaseErrorKind::UniqueViolation, _)) => Err(UserCreationError::SuchUsernameIsAlreadyUsed),
@@ -83,10 +83,7 @@ impl User {
     
     pub fn get_all_accessible(conn: &mut SqliteConnection) -> Vec<Self> {
         users
-            .filter(
-                is_deleted.eq(false)
-                    .and(functions::json_extract::<Bool, _, _>(properties.assume_not_null(), "$.acc.enabled").eq(true))
-            )
+            .filter(is_deleted.eq(false))
             .select(Self::as_select())
             .load(conn)
             .unwrap()
