@@ -17,6 +17,17 @@ pub struct Token {
 }
 
 
+#[derive(Insertable)]
+#[diesel(table_name = schema::tokens)]
+#[diesel(check_for_backend(diesel::sqlite::Sqlite))]
+struct NewToken {
+    pub value: String,
+    pub owner_id: i32,
+    pub lifetime: Option<f32>,
+    pub creation_time: NaiveDateTime
+}
+
+
 impl Token {
     pub fn get(conn: &mut SqliteConnection, v: &str) -> Option<Self> {
         tokens
@@ -25,6 +36,33 @@ impl Token {
             .first(conn)
             .optional()
             .unwrap()
+    }
+    
+    pub fn new(conn: &mut SqliteConnection, db::User { id: owner_id_, .. }: &db::User, lifetime_: Option<Duration>) -> Self {
+        diesel::insert_into(tokens)
+            .values(&NewToken {
+                value: uuid::Uuid::new_v4().to_string(),
+                lifetime: lifetime_.map(|d| d.as_secs_f32()),
+                owner_id: *owner_id_,
+                creation_time: Utc::now().naive_local(),
+            })
+            .get_result(conn)
+            .unwrap()
+            
+    } 
+    
+    pub fn auth(conn: &mut SqliteConnection, username_: &str, password: &str, lifetime_: Option<Duration>) -> Option<Self> {
+        let hashed_password_ = db::User::hash_password(password);
+        
+        let user = users
+            .filter(username.eq(username_)
+                .and(hashed_password.eq(hashed_password_)))
+            .select(db::User::as_select())
+            .first(conn)
+            .optional()
+            .unwrap()?;
+        
+        Some(Self::new(conn, &user, lifetime_))
     }
 
     pub fn get_owner(&self, conn: &mut SqliteConnection) -> db::User {

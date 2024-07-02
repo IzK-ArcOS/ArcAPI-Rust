@@ -3,13 +3,12 @@ mod functions;
 mod models;
 
 
-pub use models::users::User;
+pub use models::users::{User, UserCreationError, UserInteractionError};
 pub use models::tokens::Token;
 pub use models::messages::Message;
 
 
 use diesel::sqlite::SqliteConnection;
-use std::env;
 use diesel::connection::SimpleConnection;
 use diesel::r2d2::{Pool, ConnectionManager};
 use diesel_migrations::{embed_migrations, EmbeddedMigrations, MigrationHarness};

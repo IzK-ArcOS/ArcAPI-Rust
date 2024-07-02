@@ -7,4 +7,8 @@ address = "127.0.0.1"  # set to "0.0.0.0" if you want to expose the server
 
 [database]
 # you shouldn't change this if you dont know what is it
-#conn_pool_size = 16
+conn_pool_size = 16
+
+[auth]
+# how long should an arcos session be alive for in seconds?  (comment to remove limit) 
+session_lifetime = 604800  # 1 week

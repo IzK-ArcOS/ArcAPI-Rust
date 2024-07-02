@@ -7,22 +7,32 @@ pub struct ServerConfig {
     pub address: String
 }
 
+
 #[derive(Debug, Deserialize)]
 struct PartialDBConfig {
-    pub conn_pool_size: Option<u32>,
+    pub conn_pool_size: u32,
 }
+
+
+#[derive(Debug, Deserialize)]
+struct PartialAuthConfig {
+    pub session_lifetime: Option<u64>,
+}
+
 
 #[derive(Debug, Deserialize)]
 struct PartialConfig {
     pub name: String,
     pub server: ServerConfig,
     pub database: PartialDBConfig,
+    pub auth: PartialAuthConfig,
 }
 
 
 #[derive(Debug, Deserialize)]
 pub struct AuthConfig {
     pub code: Option<String>,
+    pub session_lifetime: Option<u64>,
 }
 
 
@@ -43,7 +53,6 @@ pub struct Config {
 
 
 impl Config {
-    pub const DEFAULT_CONN_POOL_SIZE: u32 = 16;
     pub const CONFIG_FILE_PATH_ENV_VAR: &'static str = "CONFIG_FILE";
     pub const DATABASE_FILE_PATH_ENV_VAR: &'static str = "DATABASE_URL";
     pub const AUTH_CODE_ENV_VAR: &'static str = "AUTH_CODE";
@@ -62,10 +71,11 @@ impl Config {
             server: part.server,
             database: DBConfig {
                 path: get_env_var(Self::DATABASE_FILE_PATH_ENV_VAR),
-                conn_pool_size: part.database.conn_pool_size.unwrap_or(Self::DEFAULT_CONN_POOL_SIZE)
+                conn_pool_size: part.database.conn_pool_size
             },
             auth: AuthConfig {
-                code: get_opt_env_var(Self::AUTH_CODE_ENV_VAR)
+                code: get_opt_env_var(Self::AUTH_CODE_ENV_VAR),
+                session_lifetime: part.auth.session_lifetime
             }
         }
     }
