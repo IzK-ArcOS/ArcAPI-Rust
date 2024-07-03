@@ -1,14 +1,10 @@
+// todo move the enabled property to db, and in responses just fetch that value from db
 use diesel::{
-    prelude::*,
-    sql_types::Bool
+    prelude::*
 };
 use chrono::NaiveDateTime;
 use diesel::result::DatabaseErrorKind;
-use serde_json::json;
-use super::super::{
-    schema::{self, users::dsl::*},
-    functions
-};
+use super::super::schema::{self, users::dsl::*};
 
 
 #[derive(Queryable, Selectable)]
@@ -58,7 +54,7 @@ impl User {
                 username: Some(username_.to_string()),
                 hashed_password: Some(Self::hash_password(password)),
                 creation_time: chrono::Utc::now().naive_local(),
-                properties: Some(properties_.unwrap_or(&json!({"acc": {}})).to_string()),  // xxx should the default be in a file or a const? or this is fine?
+                properties: Some(properties_.map(|p| p.to_string()).unwrap_or(include_str!("../../../assets/user_properties.default.json").into())),
                 is_deleted: false,
             })
             .get_result(conn);

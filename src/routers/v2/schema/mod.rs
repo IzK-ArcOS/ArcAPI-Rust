@@ -4,4 +4,4 @@ mod user;
 
 pub use meta_info::MetaInfo;
 pub use session::{Session, NewSession};
-pub use user::NewUser;
+pub use user::{NewUser, SelfUser};

@@ -84,7 +84,7 @@ impl Token {
     }
     
     pub fn is_valid(&self) -> bool {
-        self.is_expired()
+        !self.is_expired()
     }
     
     pub fn delete(self, conn: &mut SqliteConnection) {

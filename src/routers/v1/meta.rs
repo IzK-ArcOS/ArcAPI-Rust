@@ -2,7 +2,7 @@ use axum::extract::State;
 use axum::Json;
 use axum::routing::get;
 use crate::AppState;
-use super::schema::MetaInfo;
+use super::schema::{FlatDataResponse, MetaInfo};
 
 pub fn get_router() -> axum::Router<AppState> {
     axum::Router::new()
@@ -12,6 +12,6 @@ pub fn get_router() -> axum::Router<AppState> {
 
 async fn get_meta_info(
     State(AppState { config, .. }): State<AppState>
-) -> Json<MetaInfo> {
-    Json(MetaInfo::from(config.as_ref()))
+) -> Json<FlatDataResponse<MetaInfo>> {
+    Json(FlatDataResponse::new(MetaInfo::from(config.as_ref())))
 }

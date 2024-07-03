@@ -2,12 +2,14 @@ use axum::extract::State;
 use axum::http::StatusCode;
 use axum::Json;
 use axum::response::{IntoResponse, Response};
-use axum::routing::post;
+use axum::routing::{get, post};
 use crate::{AppState, db};
-use super::schema::NewUser;
+use crate::routers::extractors::SessionUser;
+use super::schema::{NewUser, SelfUser};
 
 pub fn get_router() -> axum::Router<AppState> {
     axum::Router::new()
+        .route("/me", get(get_self_properties).put(set_self_properties))
         .route("/", post(create_new_user))
 }
 
@@ -36,4 +38,31 @@ async fn create_new_user(
         
         db::User::create(conn, &username, &password, properties.as_ref())
     }).await.unwrap().map_err(UserCreationError::DbError)?.id.to_string())
+}
+
+
+async fn get_self_properties(
+    SessionUser(user): SessionUser
+) -> Json<SelfUser> {
+    Json(SelfUser {
+        id: user.id,
+        properties: user.map_properties_as_json()
+            .expect("token is valid, so user shouldn't be deleted")
+            .expect("user properties should be a valid json"),
+        username: user.username.expect("token is valid, so user shouldn't be deleted"),
+    })
+}
+
+
+async fn set_self_properties(
+    State(AppState { conn_pool, .. }): State<AppState>,
+    SessionUser(mut user): SessionUser,
+    Json(new_prop): Json<serde_json::Value>
+) {
+    tokio::task::spawn_blocking(move || {
+        let conn = &mut conn_pool.get().unwrap();
+
+        user.set_properties(conn, new_prop)
+            .expect("token is valid, so user shouldn't be deleted");
+    });
 }
