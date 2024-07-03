@@ -25,6 +25,7 @@ impl r2d2::CustomizeConnection<SqliteConnection, diesel::r2d2::Error> for Custom
             PRAGMA journal_mode = WAL;
             PRAGMA synchronous = NORMAL;
             PRAGMA foreign_keys = ON;
+            PRAGMA busy_timeout = 30000;
         "#).map_err(diesel::r2d2::Error::QueryError)
     }
 }
