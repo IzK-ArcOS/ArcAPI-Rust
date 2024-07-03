@@ -58,7 +58,7 @@ impl User {
                 username: Some(username_.to_string()),
                 hashed_password: Some(Self::hash_password(password)),
                 creation_time: chrono::Utc::now().naive_local(),
-                properties: Some(properties_.unwrap_or(&json!({})).to_string()),
+                properties: Some(properties_.unwrap_or(&json!({"acc": {}})).to_string()),  // xxx should the default be in a file or a const? or this is fine?
                 is_deleted: false,
             })
             .get_result(conn);
