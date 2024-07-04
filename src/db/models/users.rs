@@ -4,6 +4,7 @@ use diesel::{
 };
 use chrono::NaiveDateTime;
 use diesel::result::DatabaseErrorKind;
+use crate::db;
 use super::super::schema::{self, users::dsl::*};
 
 
@@ -64,6 +65,37 @@ impl User {
             Err(diesel::result::Error::DatabaseError(DatabaseErrorKind::UniqueViolation, _)) => Err(UserCreationError::SuchUsernameIsAlreadyUsed),
             err @ Err(_) => { err.unwrap(); unreachable!("'err' is an Err variant, so unwrap must fail") }
         }
+    }
+    
+    pub fn delete(&mut self, conn: &mut SqliteConnection) {
+        // xxx or should it return UserInteractionError::UserIsDeleted error?
+        if self.is_deleted {
+            return;
+        };
+        
+        // tokens will be deleted by a cascade
+        
+        // ...but messages are not going to delete themselves
+        for mut message in db::Message::get_all_not_deleted_made_by_user(conn, self) {
+            message.delete(conn);
+        };
+        
+        // ...then delete the user
+        diesel::update(users.find(self.id))
+            .set((
+                username.eq(Option::<String>::None),
+                hashed_password.eq(Option::<String>::None),
+                properties.eq(Option::<String>::None),
+                is_deleted.eq(true)
+            ))
+            .execute(conn)
+            .unwrap();
+        
+        // ...and sync the model
+        self.username = None;
+        self.hashed_password = None;
+        self.properties = None;
+        self.is_deleted = true;
     }
 
     pub fn map_properties_as_json(&self) -> Option<Result<serde_json::Value, serde_json::Error>> {

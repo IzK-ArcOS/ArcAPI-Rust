@@ -38,6 +38,13 @@ impl Token {
             .unwrap()
     }
     
+    pub fn get_all_by_owner(conn: &mut SqliteConnection, owner: &db::User) -> Vec<Self> {
+        tokens
+            .filter(owner_id.eq(owner.id))
+            .get_results(conn)
+            .unwrap()
+    }
+    
     pub fn new(conn: &mut SqliteConnection, db::User { id: owner_id_, .. }: &db::User, lifetime_: Option<Duration>) -> Self {
         diesel::insert_into(tokens)
             .values(&NewToken {

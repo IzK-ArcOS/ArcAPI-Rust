@@ -9,7 +9,7 @@ use super::schema::{NewUser, SelfUser};
 
 pub fn get_router() -> axum::Router<AppState> {
     axum::Router::new()
-        .route("/me", get(get_self_properties).put(set_self_properties))
+        .route("/me", get(get_self_properties).put(set_self_properties).delete(delete_self))
         .route("/", post(create_new_user))
 }
 
@@ -38,6 +38,18 @@ async fn create_new_user(
         
         db::User::create(conn, &username, &password, properties.as_ref())
     }).await.unwrap().map_err(UserCreationError::DbError)?.id.to_string())
+}
+
+
+async fn delete_self(
+    State(AppState { conn_pool, .. }): State<AppState>,
+    SessionUser(mut user): SessionUser,
+) {
+    tokio::task::spawn_blocking(move || {
+        let conn = &mut conn_pool.get().unwrap();
+        
+        user.delete(conn);
+    }).await.unwrap();
 }
 
 

@@ -3,10 +3,10 @@ diesel::table! {
         id -> Integer,
         sender_id -> Integer,
         receiver_id -> Integer,
-        body -> Text,
+        body -> Nullable<Text>,
         replying_id -> Integer,
         sent_time -> Timestamp,
-        is_read -> Bool,
+        is_read -> Nullable<Bool>,
         is_deleted -> Bool,
     }
 }
