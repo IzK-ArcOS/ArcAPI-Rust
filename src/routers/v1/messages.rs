@@ -7,7 +7,6 @@ use axum::routing::{get, post};
 use serde::Deserialize;
 use crate::{AppState, db};
 use crate::routers::extractors::SessionUser;
-use crate::routers::v1::schema;
 use crate::routers::v1::utils::{B64ToStrError, from_b64};
 use crate::routers::v1::schema::{DataResponse, Message, MessagePreview, SentMessage};
 
@@ -15,6 +14,7 @@ pub fn get_router() -> axum::Router<AppState> {
     axum::Router::new()
         .route("/list", get(list_messages))
         .route("/send", post(send_message))
+        .route("/get", get(get_message))
 }
 
 
