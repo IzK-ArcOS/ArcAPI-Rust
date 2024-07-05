@@ -133,4 +133,36 @@ impl User {
             Err(UserInteractionError::UserIsDeleted)
         }
     }
+    
+    pub fn rename(&mut self, conn: &mut SqliteConnection, new_name: String) -> Result<(), UserInteractionError> {
+        if let Some(ref mut username_) = self.username {
+            diesel::update(users.find(self.id))
+                .set(username.eq(&new_name))
+                .execute(conn)
+                .unwrap();
+
+            *username_ = new_name;
+
+            Ok(())
+        } else {
+            Err(UserInteractionError::UserIsDeleted)
+        }
+    }
+    
+    pub fn set_password(&mut self, conn: &mut SqliteConnection, new_password: &str) -> Result<(), UserInteractionError> {
+        if let Some(ref mut hashed_password_) = self.hashed_password {
+            let new_hashed = Self::hash_password(new_password);
+
+            diesel::update(users.find(self.id))
+                .set(hashed_password.eq(&new_hashed))
+                .execute(conn)
+                .unwrap();
+            
+            *hashed_password_ = new_hashed;
+            
+            Ok(())
+        } else {
+            Err(UserInteractionError::UserIsDeleted)
+        }
+    }
 }
