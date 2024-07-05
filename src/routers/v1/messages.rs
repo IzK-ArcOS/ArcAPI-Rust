@@ -15,6 +15,7 @@ pub fn get_router() -> axum::Router<AppState> {
         .route("/list", get(list_messages))
         .route("/send", post(send_message))
         .route("/get", get(get_message))
+        .route("/reply", get(send_reply))
 }
 
 
