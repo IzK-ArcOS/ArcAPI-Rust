@@ -102,10 +102,14 @@ impl User {
         self.properties.as_ref().map(|prop_raw| serde_json::from_str(prop_raw))
     }
     
+    pub fn get_username(&self) -> String {
+        self.username.as_ref().map(String::clone).unwrap_or_else(|| format!("deleted#{}", self.id))
+    }
+    
     pub fn get_all(conn: &mut SqliteConnection) -> Vec<Self> {
         users
             .select(Self::as_select())
-            .load(conn)
+            .get_results(conn)
             .unwrap()
     }
     
@@ -113,7 +117,7 @@ impl User {
         users
             .filter(is_deleted.eq(false))
             .select(Self::as_select())
-            .load(conn)
+            .get_results(conn)
             .unwrap()
     }
     

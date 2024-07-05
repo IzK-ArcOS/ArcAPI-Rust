@@ -4,7 +4,7 @@ diesel::table! {
         sender_id -> Integer,
         receiver_id -> Integer,
         body -> Nullable<Text>,
-        replying_id -> Integer,
+        replying_id -> Nullable<Integer>,
         sent_time -> Timestamp,
         is_read -> Nullable<Bool>,
         is_deleted -> Bool,

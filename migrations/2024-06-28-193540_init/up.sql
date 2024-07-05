@@ -21,7 +21,7 @@ CREATE TABLE IF NOT EXISTS messages (
     sender_id INTEGER REFERENCES users(id) NOT NULL,
     receiver_id INTEGER REFERENCES users(id) NOT NULL,
     body TEXT NULL,
-    replying_id INTEGER REFERENCES messages(id) NOT NULL,
+    replying_id INTEGER REFERENCES messages(id) NULL,
     sent_time DATETIME NOT NULL,
     is_read BOOL NULL DEFAULT FALSE,
     is_deleted BOOL NOT NULL DEFAULT FALSE

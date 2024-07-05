@@ -65,7 +65,7 @@ impl Token {
             .filter(username.eq(username_)
                 .and(hashed_password.eq(hashed_password_)))
             .select(db::User::as_select())
-            .first(conn)
+            .get_result(conn)
             .optional()
             .unwrap()?;
         
@@ -76,7 +76,7 @@ impl Token {
         users
             .find(self.owner_id)
             .select(db::User::as_select())
-            .first(conn)
+            .get_result(conn)
             .unwrap()
     }
 
