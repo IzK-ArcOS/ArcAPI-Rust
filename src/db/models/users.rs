@@ -5,10 +5,11 @@ use diesel::{
 use chrono::NaiveDateTime;
 use diesel::result::DatabaseErrorKind;
 use crate::db;
+use super::gen_id;
 use super::super::schema::{self, users::dsl::*};
 
 
-#[derive(Queryable, Selectable)]
+#[derive(Queryable, Selectable, Insertable)]
 #[diesel(table_name = schema::users)]
 #[diesel(check_for_backend(diesel::sqlite::Sqlite))]
 pub struct User {
@@ -17,17 +18,6 @@ pub struct User {
     pub hashed_password: Option<String>,
     pub creation_time: NaiveDateTime,
     pub properties: Option<String>,  // todo use serde json
-    pub is_deleted: bool
-}
-
-#[derive(Insertable)]
-#[diesel(table_name = schema::users)]
-#[diesel(check_for_backend(diesel::sqlite::Sqlite))]
-struct NewUser {
-    pub username: Option<String>,
-    pub hashed_password: Option<String>,
-    pub creation_time: NaiveDateTime,
-    pub properties: Option<String>,
     pub is_deleted: bool
 }
 
@@ -51,7 +41,8 @@ impl User {
 
     pub fn create(conn: &mut SqliteConnection, username_: &str, password: &str, properties_: Option<&serde_json::Value>) -> Result<Self, UserCreationError> {
         let r = diesel::insert_into(users)
-            .values(&NewUser {
+            .values(&User {
+                id: gen_id(),
                 username: Some(username_.to_string()),
                 hashed_password: Some(Self::hash_password(password)),
                 creation_time: chrono::Utc::now().naive_local(),
@@ -96,6 +87,14 @@ impl User {
         self.hashed_password = None;
         self.properties = None;
         self.is_deleted = true;
+    }
+    
+    pub fn get_by_username(conn: &mut SqliteConnection, username_: &str) -> Option<Self> {
+        users
+            .filter(username.eq(username_))
+            .get_result(conn)
+            .optional()
+            .unwrap()
     }
 
     pub fn map_properties_as_json(&self) -> Option<Result<serde_json::Value, serde_json::Error>> {

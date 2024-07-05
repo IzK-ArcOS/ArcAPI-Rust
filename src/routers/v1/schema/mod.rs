@@ -8,4 +8,4 @@ pub use partial_user::PartialUser;
 pub use data_response::{DataResponse, FlatDataResponse};
 pub use meta_info::MetaInfo;
 pub use session::Session;
-pub use message::MessagePreview;
+pub use message::{MessagePreview, SentMessage, Message};

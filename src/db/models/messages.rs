@@ -1,6 +1,7 @@
-use chrono::NaiveDateTime;
+use chrono::{NaiveDateTime, Utc};
 use diesel::prelude::*;
 use crate::db;
+use super::gen_id;
 use super::super::schema::{
     self,
     messages::dsl::{*, is_deleted},
@@ -8,7 +9,7 @@ use super::super::schema::{
 };
 
 
-#[derive(Queryable, Selectable)]
+#[derive(Queryable, Selectable, Insertable)]
 #[diesel(table_name = schema::messages)]
 #[diesel(check_for_backend(diesel::sqlite::Sqlite))]
 pub struct Message {
@@ -24,6 +25,34 @@ pub struct Message {
 
 
 impl Message {
+    pub fn send(conn: &mut SqliteConnection, sender: &db::User, receiver: &db::User, replying_to: Option<&db::Message>, contents: &str) -> Self {
+        diesel::insert_into(messages)
+            .values(&Message {
+                id: gen_id(),
+                sender_id: sender.id,
+                receiver_id: receiver.id,
+                body: Some(contents.to_string()),
+                replying_id: replying_to.map(|msg| msg.id),
+                sent_time: Utc::now().naive_local(),
+                is_read: Some(false),
+                is_deleted: false,
+            })
+            .get_result(conn)
+            .unwrap()
+    }
+    
+    pub fn get(conn: &mut SqliteConnection, id_: i32) -> Option<Self> {
+        messages
+            .find(id_)
+            .get_result(conn)
+            .optional()
+            .unwrap()
+    }
+    
+    pub fn is_accessible_to(&self, user: &db::User) -> bool {
+        self.sender_id == user.id || self.receiver_id == user.id
+    }
+    
     pub fn get_all_not_deleted_made_by_user(conn: &mut SqliteConnection, user: &db::User) -> Vec<Self> {
         messages
             .filter(
@@ -57,6 +86,13 @@ impl Message {
                 .select(Self::as_select())
                 .get_results(conn)
         }.unwrap()
+    }
+    
+    pub fn get_all_not_deleted_replies_for_msg(conn: &mut SqliteConnection, msg: &Self) -> Vec<Self> {
+        messages
+            .filter(replying_id.eq(msg.id))
+            .get_results(conn)
+            .unwrap()
     }
 
     pub fn delete(&mut self, conn: &mut SqliteConnection) {

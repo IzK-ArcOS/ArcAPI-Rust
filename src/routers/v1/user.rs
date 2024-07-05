@@ -1,14 +1,10 @@
-use std::string::FromUtf8Error;
 use axum::extract::{Query, State};
-use axum::http::StatusCode;
 use axum::Json;
-use axum::response::{IntoResponse, Response};
 use axum::routing::{get, post};
-use base64::{DecodeError, Engine};
-use base64::engine::general_purpose::STANDARD as B64_STANDARD;
 use serde::Deserialize;
 use crate::AppState;
 use crate::routers::extractors::SessionUser;
+use crate::routers::v1::utils::{B64ToStrError, from_b64};
 use super::schema::DataResponse;
 
 pub fn get_router() -> axum::Router<AppState> {
@@ -46,22 +42,6 @@ async fn update_self_properties(
 }
 
 
-enum B64ToStrError {
-    Base64DecodingError(DecodeError),
-    UTF8DecodingError(FromUtf8Error),
-}
-
-
-impl IntoResponse for B64ToStrError {
-    fn into_response(self) -> Response {
-        match self {
-            Self::Base64DecodingError(dec_err) => (StatusCode::BAD_REQUEST, format!("Base64 decoding error: {dec_err}")),
-            Self::UTF8DecodingError(dec_err) => (StatusCode::BAD_REQUEST, format!("UTF-8 decoding error: {dec_err}")),
-        }.into_response()
-    }
-}
-
-
 #[derive(Deserialize)]
 struct NewName {
     newname: String
@@ -73,7 +53,7 @@ async fn rename_self(
     SessionUser(mut user): SessionUser,
     Query(NewName { newname: new_enc }): Query<NewName>,
 ) -> Result<(), B64ToStrError> {
-    let new = String::from_utf8(B64_STANDARD.decode(new_enc).map_err(B64ToStrError::Base64DecodingError)?).map_err(B64ToStrError::UTF8DecodingError)?;
+    let new = from_b64(&new_enc)?;
     
     tokio::task::spawn_blocking(move || {
         let conn = &mut conn_pool.get().unwrap();
@@ -97,7 +77,7 @@ async fn change_self_password(
     SessionUser(mut user): SessionUser,
     Query(NewPassword { new: new_enc }): Query<NewPassword>,
 ) -> Result<(), B64ToStrError> {
-    let new = String::from_utf8(B64_STANDARD.decode(new_enc).map_err(B64ToStrError::Base64DecodingError)?).map_err(B64ToStrError::UTF8DecodingError)?;
+    let new = from_b64(&new_enc)?;
     
     tokio::task::spawn_blocking(move || {
         let conn = &mut conn_pool.get().unwrap();

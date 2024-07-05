@@ -6,6 +6,7 @@ mod user;
 mod meta;
 mod session;
 mod messages;
+mod utils;
 
 
 pub fn get_router() -> axum::Router<AppState> {
