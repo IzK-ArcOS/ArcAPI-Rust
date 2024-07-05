@@ -154,7 +154,7 @@ impl IntoResponse for GetMessageError {
             Self::B64DecodeError(dec_err) => dec_err.into_response(),
             Self::MessageNotFoundError => (StatusCode::NOT_FOUND, "the message was not found").into_response(),
             Self::MessageNotAccessibleError => (StatusCode::FORBIDDEN, "you do not have access to this message").into_response(),
-            Self::InvalidID(parse_err) => (StatusCode::BAD_REQUEST, "the ID is invalid").into_response(),
+            Self::InvalidID(parse_err) => (StatusCode::BAD_REQUEST, format!("the ID is invalid: {parse_err}")).into_response(),
             Self::MessageIsDeleted => (StatusCode::GONE, "the message is deleted").into_response(),
         }
     }
