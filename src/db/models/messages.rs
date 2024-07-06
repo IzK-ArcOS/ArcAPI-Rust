@@ -24,6 +24,11 @@ pub struct Message {
 }
 
 
+pub enum MessageInteractionError {
+    MessageIsDeleted
+}
+
+
 impl Message {
     pub fn send(conn: &mut SqliteConnection, sender: &db::User, receiver: &db::User, replying_to: Option<&db::Message>, contents: &str) -> Self {
         diesel::insert_into(messages)
@@ -47,6 +52,19 @@ impl Message {
             .get_result(conn)
             .optional()
             .unwrap()
+    }
+    
+    pub fn mark_as_read(&mut self, conn: &mut SqliteConnection) -> Result<(), MessageInteractionError> {
+        if self.is_deleted {
+            return Err(MessageInteractionError::MessageIsDeleted);
+        };
+        
+        diesel::update(messages.find(self.id))
+            .set(is_read.eq(Some(true)))
+            .execute(conn)
+            .unwrap();
+        
+        Ok(())
     }
     
     pub fn is_accessible_to(&self, user: &db::User) -> bool {

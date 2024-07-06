@@ -59,18 +59,18 @@ async fn list_messages(
 
 
 enum SendMessageError {
-    B64DecodeError(B64ToStrError),
-    TargetUserNotFoundError,
-    ReplyMessageNotFoundError,
+    B64Decoding(B64ToStrError),
+    TargetUserNotFound,
+    ReplyMessageNotFound,
 }
 
 
 impl IntoResponse for SendMessageError {
     fn into_response(self) -> Response {
         match self {
-            Self::B64DecodeError(dec_err) => dec_err.into_response(),
-            Self::TargetUserNotFoundError => (StatusCode::NOT_FOUND, "the target user was not found").into_response(),
-            Self::ReplyMessageNotFoundError => (StatusCode::NOT_FOUND, "the reply message was not found").into_response()
+            Self::B64Decoding(dec_err) => dec_err.into_response(),
+            Self::TargetUserNotFound => (StatusCode::NOT_FOUND, "the target user was not found").into_response(),
+            Self::ReplyMessageNotFound => (StatusCode::NOT_FOUND, "the reply message was not found").into_response()
         }
     }
 }
@@ -91,8 +91,8 @@ async fn send_message(
     let msg = tokio::task::spawn_blocking(move || {
         let conn = &mut conn_pool.get().unwrap();
         
-        let target_username = from_b64(&target_username_enc).map_err(SendMessageError::B64DecodeError)?;
-        let target = db::User::get_by_username(conn, &target_username).ok_or(SendMessageError::TargetUserNotFoundError)?;
+        let target_username = from_b64(&target_username_enc).map_err(SendMessageError::B64Decoding)?;
+        let target = db::User::get_by_username(conn, &target_username).ok_or(SendMessageError::TargetUserNotFound)?;
 
         let msg = db::Message::send(conn, &user, &target, None, &contents);
 
@@ -120,10 +120,10 @@ async fn send_reply(
     let msg = tokio::task::spawn_blocking(move || {
         let conn = &mut conn_pool.get().unwrap();
 
-        let target_username = from_b64(&target_username_enc).map_err(SendMessageError::B64DecodeError)?;
-        let target = db::User::get_by_username(conn, &target_username).ok_or(SendMessageError::TargetUserNotFoundError)?;
+        let target_username = from_b64(&target_username_enc).map_err(SendMessageError::B64Decoding)?;
+        let target = db::User::get_by_username(conn, &target_username).ok_or(SendMessageError::TargetUserNotFound)?;
 
-        let reply = db::Message::get(conn, reply_msg_id).ok_or(SendMessageError::ReplyMessageNotFoundError)?;
+        let reply = db::Message::get(conn, reply_msg_id).ok_or(SendMessageError::ReplyMessageNotFound)?;
         
         let msg = db::Message::send(conn, &user, &target, Some(&reply), &contents);
 
@@ -171,13 +171,18 @@ async fn get_message(
         let conn = &mut conn_pool.get().unwrap();
         
         let msg_id = from_b64(&msg_id_enc).map_err(GetMessageError::B64DecodeError)?.parse().map_err(GetMessageError::InvalidID)?;
-        let msg = db::Message::get(conn, msg_id).ok_or(GetMessageError::MessageNotFoundError)?;
-        
+        let mut msg = db::Message::get(conn, msg_id).ok_or(GetMessageError::MessageNotFoundError)?;
+
         if !msg.is_accessible_to(&user) {
             return Err(GetMessageError::MessageNotAccessibleError);
         };
         
-        Message::from_msg(conn, &msg).map_err(|_| GetMessageError::MessageIsDeleted)
+        if user.id == msg.receiver_id {
+            msg.mark_as_read(conn).map_err(|_| GetMessageError::MessageIsDeleted)?
+        }
+
+        Ok(Message::from_msg(conn, &msg)
+            .expect("the message is not deleted, it was already checked"))
     }).await.unwrap()?;
     
     Ok(Json(DataResponse::new(message)))
