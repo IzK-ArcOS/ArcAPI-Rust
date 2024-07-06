@@ -1,3 +1,5 @@
+use std::collections::{HashMap, HashSet};
+use std::sync::{Arc, Mutex};
 use std::num::ParseIntError;
 use axum::extract::{Query, State, };
 use axum::http::StatusCode;
@@ -8,7 +10,7 @@ use serde::Deserialize;
 use crate::{AppState, db};
 use crate::routers::extractors::SessionUser;
 use crate::routers::v1::utils::{B64ToStrError, from_b64};
-use crate::routers::v1::schema::{DataResponse, Message, MessagePreview, SentMessage};
+use crate::routers::v1::schema::{DataResponse, Message, MessagePreview, MessageThreadPart, SentMessage};
 
 pub fn get_router() -> axum::Router<AppState> {
     axum::Router::new()
@@ -17,6 +19,7 @@ pub fn get_router() -> axum::Router<AppState> {
         .route("/reply", post(send_reply))
         .route("/get", get(get_message))
         .route("/delete", get(delete_message))
+        .route("/thread", get(get_thread))
 }
 
 
@@ -169,11 +172,11 @@ async fn get_message(
     Query(MsgGet { id: msg_id_enc }): Query<MsgGet>,
 ) -> Result<Json<DataResponse<Message>>, GetMessageError> {
     let msg_id = from_b64(&msg_id_enc).map_err(GetMessageError::B64DecodeError)?.parse().map_err(GetMessageError::InvalidID)?;
-    
+
     // xxx would it be better to split up one large such blocking task, or leave as is? (more like how would it better for async pattern)
     let message = tokio::task::spawn_blocking(move || {
         let conn = &mut conn_pool.get().unwrap();
-        
+
         let mut msg = db::Message::get(conn, msg_id).ok_or(GetMessageError::MessageNotFoundError)?;
 
         if !msg.is_accessible_to(&user) {
@@ -198,20 +201,124 @@ async fn delete_message(
     Query(MsgGet { id: msg_id_enc }): Query<MsgGet>,
 ) -> Result<(), GetMessageError> {
     let msg_id = from_b64(&msg_id_enc).map_err(GetMessageError::B64DecodeError)?.parse().map_err(GetMessageError::InvalidID)?;
-    
+
     tokio::task::spawn_blocking(move || {
         let conn = &mut conn_pool.get().unwrap();
-        
+
         let mut msg = db::Message::get(conn, msg_id).ok_or(GetMessageError::MessageNotFoundError)?;
 
         if !user.id == msg.sender_id {
             return Err(GetMessageError::MessageNotAccessibleError);
         };
-        
+
         msg.delete(conn);
-        
+
         Ok(())
     }).await.unwrap()?;
-    
+
     Ok(())
+}
+
+
+async fn get_thread(
+    State(AppState { conn_pool, .. }): State<AppState>,
+    SessionUser(user): SessionUser,
+    Query(MsgGet { id: msg_id_enc }): Query<MsgGet>,
+) -> Result<Json<DataResponse<MessageThreadPart>>, GetMessageError> {
+    let msg_id = from_b64(&msg_id_enc).map_err(GetMessageError::B64DecodeError)?.parse().map_err(GetMessageError::InvalidID)?;
+
+    // i am sorry for this code, but hey it should be fast! ...i hope
+    let msg_thread = tokio::task::spawn_blocking(move || {
+        let conn = &mut conn_pool.get().unwrap();
+
+        let msg = db::Message::get(conn, msg_id).ok_or(GetMessageError::MessageNotFoundError)?;
+
+        if !msg.is_accessible_to(&user) {
+            return Err(GetMessageError::MessageNotAccessibleError);
+        };
+
+        let (thread_parts_ids, root_msg_id, messages) = {
+            let mut thread_parts: HashMap<i32, Vec<i32>> = HashMap::new();  // an {id: [msg_which_reply_to_id]} map
+            let mut messages: HashMap<i32, db::Message> = HashMap::new();  // used for caching
+            let mut ids_to_resolve_queue = vec![msg.id];
+
+            messages.insert(msg.id, msg);
+            let mut resolved_ids = HashSet::new();
+            let mut root_msg_id = None;
+
+            while let Some(msg_id) = ids_to_resolve_queue.pop() {
+                // xxx is this check even needed?
+                if resolved_ids.contains(&msg_id) {
+                    continue;
+                };
+
+                let msg = messages.entry(msg_id).or_insert_with(|| db::Message::get(conn, msg_id).expect("the queue stores only existing IDs"));
+
+                if let Some(replying_msg) = msg.get_replying_msg(conn) {
+                    if !resolved_ids.contains(&replying_msg.id) {
+                        let thread_part = thread_parts.entry(replying_msg.id).or_default();
+
+                        thread_part.push(msg_id);
+
+                        ids_to_resolve_queue.push(replying_msg.id);
+
+                        // todo somehow cache this
+                        // messages.insert(replying_msg.id, replying_msg);
+                    };
+                } else {
+                    if root_msg_id.is_none() {
+                        root_msg_id = Some(msg_id);
+                    } else {
+                        unreachable!("there cannot be multiple message roots");
+                    };
+                };
+
+                for reply_msg in msg.get_all_not_deleted_replies(conn) {
+                    if !reply_msg.is_accessible_to(&user) || resolved_ids.contains(&reply_msg.id) {
+                        continue;
+                    };
+
+                    let thread_part = thread_parts.entry(msg_id).or_default();
+
+                    thread_part.push(reply_msg.id);
+
+                    ids_to_resolve_queue.push(reply_msg.id);
+
+                    messages.insert(reply_msg.id, reply_msg);
+                };
+
+                resolved_ids.insert(msg_id);
+            };
+
+            (thread_parts, root_msg_id.unwrap(), messages)
+        };
+
+        let mut thread_parts = {
+            let mut thread_parts: HashMap<i32, Arc<Mutex<MessageThreadPart>>> = HashMap::new();
+            let mut get_thread_part = |id: i32| {
+                thread_parts.entry(id).or_insert_with(|| Arc::new(Mutex::new(
+                    MessageThreadPart::from_msg_partially(
+                        conn,
+                        messages.get(&id)
+                            .expect("all messages should have gotten cached"),
+                        80
+                    )
+                ))).clone()
+            };
+
+            for (msg_id, replies_ids) in thread_parts_ids.iter() {
+                let thread_part = get_thread_part(*msg_id);
+
+                thread_part.lock().unwrap().replies.append(&mut replies_ids.iter().map(|id| get_thread_part(*id)).collect());
+            };
+
+            thread_parts
+        };
+
+        Ok(Arc::<_>::try_unwrap(thread_parts.remove(&root_msg_id).unwrap())
+            .expect("it's the root message, so it should not have any references to it")
+            .into_inner().unwrap())
+    }).await.unwrap()?;
+
+    Ok(Json(DataResponse::new(msg_thread)))
 }

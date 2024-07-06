@@ -6,7 +6,7 @@ edition = "2021"
 [dependencies]
 diesel = { version = "2.2.1", features = ["sqlite", "serde_json", "r2d2", "chrono", "returning_clauses_for_sqlite_3_35"] }
 diesel_migrations = "2.2.0"
-serde = { version = "1.0.203", features = ["derive"] }
+serde = { version = "1.0.203", features = ["derive", "rc"] }
 serde_json = "1.0.118"
 serde_with = "3.8.3"
 toml = "0.8.14"

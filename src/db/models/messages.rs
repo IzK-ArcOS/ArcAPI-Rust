@@ -30,7 +30,7 @@ pub enum MessageInteractionError {
 
 
 impl Message {
-    pub fn send(conn: &mut SqliteConnection, sender: &db::User, receiver: &db::User, replying_to: Option<&db::Message>, contents: &str) -> Self {
+    pub fn send(conn: &mut SqliteConnection, sender: &db::User, receiver: &db::User, replying_to: Option<&Message>, contents: &str) -> Self {
         diesel::insert_into(messages)
             .values(&Message {
                 id: gen_id(),
@@ -70,6 +70,15 @@ impl Message {
     pub fn is_accessible_to(&self, user: &db::User) -> bool {
         self.sender_id == user.id || self.receiver_id == user.id
     }
+
+    pub fn get_body_preview(&self, preview_length: usize) -> Result<&str, MessageInteractionError> {
+        Ok(&self.body.as_ref().ok_or(MessageInteractionError::MessageIsDeleted)?
+            [..preview_length.min(self.body.as_ref().expect("the body was already checked is deleted").len())])
+    }
+    
+    pub fn get_replying_msg(&self, conn: &mut SqliteConnection) -> Option<Self> {
+        self.replying_id.map(|id_| Self::get(conn, id_).unwrap())
+    }
     
     pub fn get_all_not_deleted_made_by_user(conn: &mut SqliteConnection, user: &db::User) -> Vec<Self> {
         messages
@@ -106,9 +115,9 @@ impl Message {
         }.unwrap()
     }
     
-    pub fn get_all_not_deleted_replies_for_msg(conn: &mut SqliteConnection, msg: &Self) -> Vec<Self> {
+    pub fn get_all_not_deleted_replies(&self, conn: &mut SqliteConnection) -> Vec<Self> {
         messages
-            .filter(replying_id.eq(msg.id))
+            .filter(replying_id.eq(self.id))
             .get_results(conn)
             .unwrap()
     }
