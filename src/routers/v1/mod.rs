@@ -7,6 +7,7 @@ mod meta;
 mod session;
 mod messages;
 mod utils;
+mod filesystem;
 
 
 pub fn get_router() -> axum::Router<AppState> {
@@ -15,5 +16,6 @@ pub fn get_router() -> axum::Router<AppState> {
         .nest("/user", user::get_router())
         .nest("/connect", meta::get_router())
         .nest("/messages", messages::get_router())
+        .nest("/fs", filesystem::get_router())
         .nest("/", session::get_router())
 }

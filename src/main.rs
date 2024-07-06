@@ -2,6 +2,7 @@ mod db;
 mod routers;
 mod config;
 mod middleware;
+mod filesystem;
 
 
 use std::sync::Arc;
