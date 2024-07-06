@@ -76,17 +76,17 @@ pub struct Message {
 
 
 impl Message {
-    pub fn from_msg(conn: &mut SqliteConnection, message: &db::Message) -> Result<Self, ConversionError> {
-        Ok(Self {
+    pub fn from_msg(conn: &mut SqliteConnection, message: &db::Message) -> Self {
+        Self {
             id: message.id,
             sender: message.get_sender(conn).get_username(),
             receiver: message.get_receiver(conn).get_username(),
-            body: message.body.clone().ok_or(ConversionError::ItemIsDeleted)?,
+            body: message.body.clone().unwrap_or("[deleted]".to_string()),
             replies: message.get_all_not_deleted_replies(conn).into_iter().map(|msg| msg.id).collect(),
             replying_to: message.replying_id,
             timestamp: message.sent_time.signed_duration_since(NaiveDateTime::UNIX_EPOCH).num_milliseconds() as u64,
-            read: message.is_read.ok_or(ConversionError::ItemIsDeleted)?,
-        })
+            read: message.is_read.unwrap_or(false),
+        }
     }
 }
 

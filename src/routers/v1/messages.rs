@@ -184,11 +184,10 @@ async fn get_message(
         };
         
         if user.id == msg.receiver_id {
-            msg.mark_as_read(conn).map_err(|_| GetMessageError::MessageIsDeleted)?
+            let _ = msg.mark_as_read(conn);
         }
 
-        Ok(Message::from_msg(conn, &msg)
-            .expect("the message is not deleted, it was already checked"))
+        Ok(Message::from_msg(conn, &msg))
     }).await.unwrap()?;
     
     Ok(Json(DataResponse::new(message)))
