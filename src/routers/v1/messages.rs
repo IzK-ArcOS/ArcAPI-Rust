@@ -16,6 +16,7 @@ pub fn get_router() -> axum::Router<AppState> {
         .route("/send", post(send_message))
         .route("/reply", post(send_reply))
         .route("/get", get(get_message))
+        .route("/delete", get(delete_message))
 }
 
 
@@ -154,7 +155,7 @@ impl IntoResponse for GetMessageError {
         match self {
             Self::B64DecodeError(dec_err) => dec_err.into_response(),
             Self::MessageNotFoundError => (StatusCode::NOT_FOUND, "the message was not found").into_response(),
-            Self::MessageNotAccessibleError => (StatusCode::FORBIDDEN, "you do not have access to this message").into_response(),
+            Self::MessageNotAccessibleError => (StatusCode::FORBIDDEN, "you do not have such access to this message").into_response(),
             Self::InvalidID(parse_err) => (StatusCode::BAD_REQUEST, format!("the ID is invalid: {parse_err}")).into_response(),
             Self::MessageIsDeleted => (StatusCode::GONE, "the message is deleted").into_response(),
         }
@@ -165,12 +166,14 @@ impl IntoResponse for GetMessageError {
 async fn get_message(
     State(AppState { conn_pool, .. }): State<AppState>,
     SessionUser(user): SessionUser,
-    Query(MsgGet { id: msg_id_enc }): Query<MsgGet> 
+    Query(MsgGet { id: msg_id_enc }): Query<MsgGet>,
 ) -> Result<Json<DataResponse<Message>>, GetMessageError> {
+    let msg_id = from_b64(&msg_id_enc).map_err(GetMessageError::B64DecodeError)?.parse().map_err(GetMessageError::InvalidID)?;
+    
+    // xxx would it be better to split up one large such blocking task, or leave as is? (more like how would it better for async pattern)
     let message = tokio::task::spawn_blocking(move || {
         let conn = &mut conn_pool.get().unwrap();
         
-        let msg_id = from_b64(&msg_id_enc).map_err(GetMessageError::B64DecodeError)?.parse().map_err(GetMessageError::InvalidID)?;
         let mut msg = db::Message::get(conn, msg_id).ok_or(GetMessageError::MessageNotFoundError)?;
 
         if !msg.is_accessible_to(&user) {
@@ -186,4 +189,29 @@ async fn get_message(
     }).await.unwrap()?;
     
     Ok(Json(DataResponse::new(message)))
+}
+
+
+async fn delete_message(
+    State(AppState { conn_pool, .. }): State<AppState>,
+    SessionUser(user): SessionUser,
+    Query(MsgGet { id: msg_id_enc }): Query<MsgGet>,
+) -> Result<(), GetMessageError> {
+    let msg_id = from_b64(&msg_id_enc).map_err(GetMessageError::B64DecodeError)?.parse().map_err(GetMessageError::InvalidID)?;
+    
+    tokio::task::spawn_blocking(move || {
+        let conn = &mut conn_pool.get().unwrap();
+        
+        let mut msg = db::Message::get(conn, msg_id).ok_or(GetMessageError::MessageNotFoundError)?;
+
+        if !user.id == msg.sender_id {
+            return Err(GetMessageError::MessageNotAccessibleError);
+        };
+        
+        msg.delete(conn);
+        
+        Ok(())
+    }).await.unwrap()?;
+    
+    Ok(())
 }
