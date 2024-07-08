@@ -108,7 +108,7 @@ impl Filesystem {
     
     pub async fn write_file(&self, path: &Path, data: &[u8]) -> FSRes<()> {
         if let Some(total_size) = self.total_size {
-            if self.get_item_size(&PathBuf::from_str(".").unwrap()).await? + data.len() as u64 > total_size {
+            if self.get_item_size(".".as_ref()).await? + data.len() as u64 > total_size {
                 return Err(FSError::NotEnoughStorage);
             }
         };
@@ -141,7 +141,7 @@ impl Filesystem {
         let source = self.construct_path(source)?;
 
         if let Some(total_size) = self.total_size {
-            if self.get_item_size(&PathBuf::from_str(".").unwrap()).await? + self.get_item_size(&source).await? > total_size {
+            if self.get_item_size(".".as_ref()).await? + self.get_item_size(&source).await? > total_size {
                 return Err(FSError::NotEnoughStorage);
             }
         };

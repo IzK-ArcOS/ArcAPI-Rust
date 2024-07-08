@@ -22,7 +22,7 @@ pub struct FSQuota {
 impl FSQuota {
     pub async fn new(usfs: &UserScopedFS<'_>, user: &db::User) -> FSRes<Self> {
         let max = usfs.fs().userspace_size().unwrap_or(u64::MAX);
-        let used = usfs.get_item_size(&PathBuf::from_str(".").unwrap()).await?;
+        let used = usfs.get_item_size(".".as_ref()).await?;
 
         Ok(Self {
             username: user.get_username(),

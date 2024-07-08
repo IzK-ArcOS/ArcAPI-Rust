@@ -143,7 +143,7 @@ async fn delete_self(
         user.delete(conn);
     }).await.unwrap();
 
-    match usfs.remove_item(&PathBuf::from_str(".").unwrap()).await {
+    match usfs.remove_item(".".as_ref()).await {
         Err(FSError::HFS(err)) if err.kind() == ErrorKind::NotFound => {},
         whatever => whatever.unwrap()   // i really hope this doesnt fail under most other circumstances as well
     }

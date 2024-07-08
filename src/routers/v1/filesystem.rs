@@ -187,7 +187,7 @@ async fn get_usfs_tree(
 ) -> Result<Json<DataResponse<FSTree>>, FSInteractionError> {
     let usfs = mk_usfs(&filesystem, &user).await?;
     
-    Ok(Json(DataResponse::new(FSTree::new(&usfs, &PathBuf::from_str(".").unwrap()).await.map_err(FSInteractionError::FS)?)))
+    Ok(Json(DataResponse::new(FSTree::new(&usfs, ".".as_ref()).await.map_err(FSInteractionError::FS)?)))
 }
 
 

@@ -18,15 +18,14 @@ impl<'a> UserScopedFS<'a> {
             base_path: PathBuf::from_str(&user_id.to_string()).unwrap(),
         };
         
-        // yes i know this is some very weird code 
-        let path = PathBuf::from_str(".").unwrap();  // xxx should it actually be a part of the struct? to not redo such shinnanigans each time
-        if !fs.construct_path(&self_.construct_path(&path)?)?.exists() {
+        // yes i know this is some very weird code
+        if !fs.construct_path(&self_.construct_path(".".as_ref())?)?.exists() {
             let td_res = self_.deploy_template().await;
             
             if let Some(res) = td_res {
                 res?;
             } else {
-                self_.create_dir(&path).await?;
+                self_.create_dir(".".as_ref()).await?;
             };
         };
         
@@ -57,7 +56,7 @@ impl<'a> UserScopedFS<'a> {
 
     pub async fn write_file(&self, path: &Path, data: &[u8]) -> FSRes<()> {
         if let Some(total_size) = self.fs.userspace_size() {
-            if self.get_item_size(&PathBuf::from_str(".").unwrap()).await? + data.len() as u64 > total_size {
+            if self.get_item_size(".".as_ref()).await? + data.len() as u64 > total_size {
                 return Err(FSError::NotEnoughStorage);
             }
         };
@@ -78,7 +77,7 @@ impl<'a> UserScopedFS<'a> {
 
     pub async fn copy_item(&self, source: &Path, target: &Path) -> FSRes<()> {
         if let Some(total_size) = self.fs.userspace_size() {
-            if self.get_item_size(&PathBuf::from_str(".").unwrap()).await? + self.get_item_size(source).await? > total_size {
+            if self.get_item_size(".".as_ref()).await? + self.get_item_size(source).await? > total_size {
                 return Err(FSError::NotEnoughStorage);
             }
         };
@@ -133,7 +132,7 @@ impl<'a> UserScopedFS<'a> {
     }
 
     async fn adapt_paths(&self, paths: Vec<PathBuf>) -> FSRes<Vec<PathBuf>> {
-        let true_base_path = self.fs.construct_path(&self.construct_path(&PathBuf::from_str(".").unwrap())?)?;
+        let true_base_path = self.fs.construct_path(&self.construct_path(".".as_ref())?)?;
         Ok(paths.into_iter().map(|p| p.strip_prefix(&true_base_path).unwrap().to_path_buf()).collect())
     }
 }
