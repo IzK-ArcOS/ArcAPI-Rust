@@ -3,15 +3,16 @@ mod routers;
 mod config;
 mod middleware;
 mod filesystem;
+mod env;
 
 
-use std::path::PathBuf;
 use std::sync::Arc;
 use axum::extract::Request;
 use axum::ServiceExt;
 use tower::Layer;
 use config::Config;
 use filesystem::Filesystem;
+use crate::env::load_dotenv;
 
 
 #[derive(Debug, Clone)]
@@ -26,7 +27,7 @@ struct AppState {
 async fn main() {
     // todo start up logging
 
-    dotenvy::dotenv().expect(".env file should be a valid env vars file");
+    load_dotenv();
     
     let config = Config::load();
     
@@ -36,7 +37,7 @@ async fn main() {
     
     let filesystem = Filesystem::new(
         &config.filesystem.storage_path, 
-        config.filesystem.template_path.as_ref().map(|p| p.as_path()),
+        config.filesystem.template_path.as_deref(),
         config.filesystem.total_size,
         config.filesystem.user_space_size
     );

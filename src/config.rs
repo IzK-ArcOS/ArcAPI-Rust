@@ -1,5 +1,6 @@
 use std::env::VarError;
-use std::path::PathBuf;
+use std::io::ErrorKind;
+use std::path::{Path, PathBuf};
 use serde::Deserialize;
 
 #[derive(Debug, Deserialize)]
@@ -65,6 +66,8 @@ pub struct Config {
 
 
 impl Config {
+    pub const DEFAULT_CONFIG_FILE_CONTENTS: &'static str = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/assets/arcapi.default.toml"));
+    
     pub const CONFIG_FILE_PATH_ENV_VAR: &'static str = "CONFIG_FILE";
     pub const DATABASE_FILE_PATH_ENV_VAR: &'static str = "DATABASE_URL";
     pub const AUTH_CODE_ENV_VAR: &'static str = "AUTH_CODE";
@@ -72,8 +75,7 @@ impl Config {
     pub fn load() -> Self {
         let path = get_env_var(Self::CONFIG_FILE_PATH_ENV_VAR);
         
-        let config_raw = std::fs::read_to_string(&path)
-            .unwrap_or_else(|err| panic!("{path} should be a valid config file: {err}"));
+        let config_raw = Self::read(path.as_str().as_ref());
 
         let part = toml::from_str::<PartialConfig>(&config_raw)
             .unwrap_or_else(|err| panic!("{path} should be a valid config file:\n{err}"));
@@ -92,12 +94,28 @@ impl Config {
             }
         }
     }
+    
+    fn read(path: &Path) -> String {
+        std::fs::read_to_string(&path)
+            .unwrap_or_else(|err| match err {
+                _ if err.kind() == ErrorKind::NotFound => {
+                    Self::create_default(path);
+                    Self::read(path)
+                },
+                err => panic!("unhandled error occurred during config file loading: {err}") 
+            })
+    }
+
+    fn create_default(path: &Path) {
+        std::fs::write(path, Self::DEFAULT_CONFIG_FILE_CONTENTS)
+            .unwrap_or_else(|err| panic!("an error occurred during creation of default config file: {err}"));
+    }
 }
 
 
 fn get_env_var(name: &str) -> String {
     std::env::var(name)
-        .expect(&format!("env var '{name}' should be set and valid"))
+        .unwrap_or_else(|_| panic!("env var '{name}' should be set and valid"))
 }
 
 
