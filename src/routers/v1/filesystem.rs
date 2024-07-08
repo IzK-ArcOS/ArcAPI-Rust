@@ -7,8 +7,8 @@ use axum::response::{IntoResponse, Response};
 use axum::routing::{get, post};
 use bytes::Bytes;
 use serde::Deserialize;
-use crate::AppState;
-use crate::filesystem::{FSError, UserScopedFS};
+use crate::{AppState, db};
+use crate::filesystem::{Filesystem, FSError, UserScopedFS};
 use crate::routers::extractors::SessionUser;
 use crate::routers::v1::schema::{DataResponse, FSDirListing, FSQuota, FSTree};
 use crate::routers::v1::utils::{B64ToStrError, from_b64};
@@ -48,7 +48,7 @@ async fn get_fs_quota(
     State(AppState { filesystem, .. }): State<AppState>,
     SessionUser(user): SessionUser
 ) -> Result<Json<DataResponse<FSQuota>>, FSInteractionError> {
-    let usfs = UserScopedFS::new(&filesystem, user.id).await.map_err(FSInteractionError::FS)?;
+    let usfs = mk_usfs(&filesystem, &user).await?;
 
     Ok(Json(DataResponse::new(FSQuota::new(&usfs, &user).await.map_err(FSInteractionError::FS)?)))
 }
@@ -56,18 +56,18 @@ async fn get_fs_quota(
 
 #[derive(Deserialize)]
 struct Path {
-    path: String,
+    #[serde(rename = "path")]
+    path_enc: String,
 }
 
 
 async fn get_dir_listing(
     State(AppState { filesystem, .. }): State<AppState>,
     SessionUser(user): SessionUser,
-    Query(Path { path: path_enc }): Query<Path>,
+    Query(Path { path_enc }): Query<Path>,
 ) -> Result<Json<DataResponse<FSDirListing>>, FSInteractionError> {
-    // todo do smth about these 2 repetitive lines
-    let path = PathBuf::from_str(&from_b64(&path_enc).map_err(FSInteractionError::B64Decoding)?).unwrap();
-    let usfs = UserScopedFS::new(&filesystem, user.id).await.map_err(FSInteractionError::FS)?;
+    let path = dec_path(&path_enc)?;
+    let usfs = mk_usfs(&filesystem, &user).await?;
 
     Ok(Json(DataResponse::new(FSDirListing::new(&usfs, &path).await.map_err(FSInteractionError::FS)?)))
 }
@@ -76,10 +76,10 @@ async fn get_dir_listing(
 async fn create_dir(
     State(AppState { filesystem, .. }): State<AppState>,
     SessionUser(user): SessionUser,
-    Query(Path { path: path_enc }): Query<Path>,
+    Query(Path { path_enc }): Query<Path>,
 ) -> Result<Json<DataResponse<()>>, FSInteractionError> {
-    let path = PathBuf::from_str(&from_b64(&path_enc).map_err(FSInteractionError::B64Decoding)?).unwrap();
-    let usfs = UserScopedFS::new(&filesystem, user.id).await.map_err(FSInteractionError::FS)?;
+    let path = dec_path(&path_enc)?;
+    let usfs = mk_usfs(&filesystem, &user).await?;
 
     usfs.create_dir(&path).await.map_err(FSInteractionError::FS)?;
 
@@ -90,23 +90,23 @@ async fn create_dir(
 async fn get_file(
     State(AppState { filesystem, .. }): State<AppState>,
     SessionUser(user): SessionUser,
-    Query(Path { path: path_enc }): Query<Path>,
+    Query(Path { path_enc }): Query<Path>,
 ) -> Result<Vec<u8>, FSInteractionError> {
-    let path = PathBuf::from_str(&from_b64(&path_enc).map_err(FSInteractionError::B64Decoding)?).unwrap();
-    let usfs = UserScopedFS::new(&filesystem, user.id).await.map_err(FSInteractionError::FS)?;
+    let path = dec_path(&path_enc)?;
+    let usfs = mk_usfs(&filesystem, &user).await?;
 
-    Ok(usfs.read_file(&path).await.map_err(FSInteractionError::FS)?)
+    usfs.read_file(&path).await.map_err(FSInteractionError::FS)
 }
 
 
 async fn write_file(
     State(AppState { filesystem, .. }): State<AppState>,
     SessionUser(user): SessionUser,
-    Query(Path { path: path_enc }): Query<Path>,
+    Query(Path { path_enc }): Query<Path>,
     data: Bytes,
 ) -> Result<(), FSInteractionError> {
-    let path = PathBuf::from_str(&from_b64(&path_enc).map_err(FSInteractionError::B64Decoding)?).unwrap();
-    let usfs = UserScopedFS::new(&filesystem, user.id).await.map_err(FSInteractionError::FS)?;
+    let path = dec_path(&path_enc)?;
+    let usfs = mk_usfs(&filesystem, &user).await?;
 
     usfs.write_file(&path, &data).await.map_err(FSInteractionError::FS)?;
 
@@ -116,19 +116,20 @@ async fn write_file(
 
 #[derive(Deserialize)]
 struct Target {
-    target: String,
+    #[serde(rename = "target")]
+    target_enc: String,
 }
 
 
 async fn copy_item(
     State(AppState { filesystem, .. }): State<AppState>,
     SessionUser(user): SessionUser,
-    Query(Path { path: source_enc }): Query<Path>,
-    Query(Target { target: target_enc }): Query<Target>,
+    Query(Path { path_enc: source_enc }): Query<Path>,
+    Query(Target { target_enc }): Query<Target>,
 ) -> Result<(), FSInteractionError> {
-    let source = PathBuf::from_str(&from_b64(&source_enc).map_err(FSInteractionError::B64Decoding)?).unwrap();
-    let target = PathBuf::from_str(&from_b64(&target_enc).map_err(FSInteractionError::B64Decoding)?).unwrap();
-    let usfs = UserScopedFS::new(&filesystem, user.id).await.map_err(FSInteractionError::FS)?;
+    let source = dec_path(&source_enc)?;
+    let target = dec_path(&target_enc)?;
+    let usfs = mk_usfs(&filesystem, &user).await?;
 
     usfs.copy_item(&source, &target).await.map_err(FSInteractionError::FS)?;
 
@@ -139,10 +140,10 @@ async fn copy_item(
 async fn remove_item(
     State(AppState { filesystem, .. }): State<AppState>,
     SessionUser(user): SessionUser,
-    Query(Path { path: path_enc }): Query<Path>,
+    Query(Path { path_enc }): Query<Path>,
 ) -> Result<(), FSInteractionError> {
-    let path = PathBuf::from_str(&from_b64(&path_enc).map_err(FSInteractionError::B64Decoding)?).unwrap();
-    let usfs = UserScopedFS::new(&filesystem, user.id).await.map_err(FSInteractionError::FS)?;
+    let path = dec_path(&path_enc)?;
+    let usfs = mk_usfs(&filesystem, &user).await?;
 
     usfs.remove_item(&path).await.map_err(FSInteractionError::FS)?;
 
@@ -150,22 +151,22 @@ async fn remove_item(
 }
 
 #[derive(Deserialize)]
-struct ItemRename {
+struct ItemMove {
     #[serde(rename = "oldpath")]
-    old_path: String,
+    source_enc: String,
     #[serde(rename = "newpath")]
-    new_path: String,
+    target_enc: String,
 }
 
 
 async fn move_item(
     State(AppState { filesystem, .. }): State<AppState>,
     SessionUser(user): SessionUser,
-    Query(ItemRename { old_path: source_enc, new_path: target_enc }): Query<ItemRename>,
+    Query(ItemMove { source_enc, target_enc }): Query<ItemMove>,
 ) -> Result<(), FSInteractionError> {
-    let source = PathBuf::from_str(&from_b64(&source_enc).map_err(FSInteractionError::B64Decoding)?).unwrap();
-    let target = PathBuf::from_str(&from_b64(&target_enc).map_err(FSInteractionError::B64Decoding)?).unwrap();
-    let usfs = UserScopedFS::new(&filesystem, user.id).await.map_err(FSInteractionError::FS)?;
+    let source = dec_path(&source_enc)?;
+    let target = dec_path(&target_enc)?;
+    let usfs = mk_usfs(&filesystem, &user).await?;
     
     usfs.move_item(&source, &target).await.map_err(FSInteractionError::FS)?;
     
@@ -177,7 +178,17 @@ async fn get_usfs_tree(
     State(AppState { filesystem, .. }): State<AppState>,
     SessionUser(user): SessionUser,
 ) -> Result<Json<DataResponse<FSTree>>, FSInteractionError> {
-    let usfs = UserScopedFS::new(&filesystem, user.id).await.map_err(FSInteractionError::FS)?;
+    let usfs = mk_usfs(&filesystem, &user).await?;
     
     Ok(Json(DataResponse::new(FSTree::new(&usfs, &PathBuf::from_str(".").unwrap()).await.map_err(FSInteractionError::FS)?)))
+}
+
+
+fn dec_path(s: &str) -> Result<PathBuf, FSInteractionError> {
+    Ok(PathBuf::from_str(&from_b64(s).map_err(FSInteractionError::B64Decoding)?).unwrap())
+}
+
+
+async fn mk_usfs<'a>(fs: &'a Filesystem, user: &db::User) -> Result<UserScopedFS<'a>, FSInteractionError> {
+    UserScopedFS::new(&fs, user.id).await.map_err(FSInteractionError::FS)
 }
