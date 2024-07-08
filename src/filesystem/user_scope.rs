@@ -118,14 +118,14 @@ impl<'a> UserScopedFS<'a> {
     }
 
     /// WARNING: EXPECTS AN ALREADY CONSTRUCTED PATH
-    pub fn is_breaking_out(&self, final_path: &Path) -> FSRes<bool> {
-        Ok(self.fs.is_breaking_out(&self.fs.construct_path(final_path)?))
+    pub fn is_breaking_out(&self, final_path: &Path) -> bool {
+        !final_path.starts_with(&self.base_path)
     }
 
     fn construct_path(&self, path: &Path) -> FSRes<PathBuf> {
         let final_path = self.base_path.join(path).normalize();
         
-        if self.is_breaking_out(&final_path)? {
+        if self.is_breaking_out(&final_path) {
             return Err(FSError::PathBreaksOut)
         };
 
