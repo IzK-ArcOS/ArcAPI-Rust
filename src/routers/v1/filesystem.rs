@@ -11,8 +11,8 @@ use serde::Deserialize;
 use crate::{AppState, db};
 use crate::filesystem::{Filesystem, FSError, UserScopedFS};
 use crate::routers::extractors::SessionUser;
-use crate::routers::v1::schema::{DataResponse, FSDirListing, FSQuota, FSTree};
-use crate::routers::v1::utils::{B64ToStrError, from_b64};
+use super::schema::{DataResponse, FSDirListing, FSQuota, FSTree};
+use super::utils::{B64ToStrError, from_b64};
 
 pub fn get_router() -> axum::Router<AppState> {
     axum::Router::new()
