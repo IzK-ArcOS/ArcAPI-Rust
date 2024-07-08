@@ -54,6 +54,7 @@ dependencies = [
  "futures",
  "glob",
  "hmac-sha512",
+ "log",
  "mime_guess",
  "normalize-path",
  "r2d2",

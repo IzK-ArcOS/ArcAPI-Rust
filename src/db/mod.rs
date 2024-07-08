@@ -35,6 +35,8 @@ pub type ConnPool = Pool<ConnectionManager<SqliteConnection>>;
 
 
 pub fn create_db_connection_pool(database_url: &str, max_pool_size: u32) -> ConnPool {
+    log::debug!("creating db connection pool...");
+    
     Pool::builder()
         .max_size(max_pool_size)
         .connection_customizer(Box::new(CustomConnectionOptions()))
@@ -44,6 +46,8 @@ pub fn create_db_connection_pool(database_url: &str, max_pool_size: u32) -> Conn
 
 
 pub fn migrate(conn: &mut SqliteConnection) {
+    log::debug!("migrating db...");
+    
     const MIGRATIONS: EmbeddedMigrations = embed_migrations!("migrations");
 
     conn.run_pending_migrations(MIGRATIONS)

@@ -73,6 +73,8 @@ impl Config {
     pub const AUTH_CODE_ENV_VAR: &'static str = "AUTH_CODE";
     
     pub fn load() -> Self {
+        log::debug!("loading config file...");
+        
         let path = get_env_var(Self::CONFIG_FILE_PATH_ENV_VAR);
         
         let config_raw = Self::read(path.as_str().as_ref());
@@ -96,7 +98,8 @@ impl Config {
     }
     
     fn read(path: &Path) -> String {
-        std::fs::read_to_string(&path)
+        log::debug!("reading config file...");
+        std::fs::read_to_string(path)
             .unwrap_or_else(|err| match err {
                 _ if err.kind() == ErrorKind::NotFound => {
                     Self::create_default(path);
@@ -107,6 +110,7 @@ impl Config {
     }
 
     fn create_default(path: &Path) {
+        log::debug!("creating default config file...");
         std::fs::write(path, Self::DEFAULT_CONFIG_FILE_CONTENTS)
             .unwrap_or_else(|err| panic!("an error occurred during creation of default config file: {err}"));
     }

@@ -25,8 +25,13 @@ struct AppState {
 
 #[tokio::main]
 async fn main() {
-    // todo start up logging
-
+    // xxx should logging level be configurable?
+    tracing_subscriber::fmt()
+        .with_max_level(tracing::Level::DEBUG)
+        .init();
+    
+    log::info!("starting up...");
+    
     load_dotenv();
     
     let config = Config::load();
@@ -64,10 +69,8 @@ async fn main() {
 
     let app = tower_http::normalize_path::NormalizePathLayer::trim_trailing_slash().layer(router);
 
-    tracing_subscriber::fmt()
-        .with_max_level(tracing::Level::DEBUG)
-        .init();
-
+    log::info!("starting server!!!");
+    
     let listener = tokio::net::TcpListener::bind(addr).await.unwrap();
     axum::serve(listener, ServiceExt::<Request>::into_make_service(app)).await.unwrap();
 }

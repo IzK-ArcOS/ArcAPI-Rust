@@ -45,6 +45,8 @@ pub type FSRes<T> = Result<T, FSError>;
 
 impl Filesystem {
     pub fn new(storage_path: &Path, template_path: Option<&Path>, total_size: Option<u64>, userspace_size: Option<u64>) -> Self {
+        log::debug!("initializing fs...");
+        
         if !storage_path.exists() {
             std::fs::create_dir(storage_path).unwrap()
         } else if !storage_path.is_dir() {
