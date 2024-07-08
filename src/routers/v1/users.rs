@@ -19,7 +19,7 @@ async fn get_all_users(
     }).await.unwrap();
     
     let partial_users = users.into_iter()
-        .filter_map(|u| PartialUser::try_from(u).ok())
+        .filter_map(|u| PartialUser::try_new(&u).ok())
         .collect::<Vec<_>>();
     
     axum::Json(DataResponse::new(partial_users))

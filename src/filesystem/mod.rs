@@ -1,37 +1,74 @@
+use std::fs::Metadata;
 use std::path::{Path, PathBuf};
+use std::str::FromStr;
 use std::time::SystemTime;
+use normalize_path::NormalizePath;
 
 mod user_scope;
 
 
+pub use user_scope::UserScopedFS;
+
+
+#[derive(Debug)]
 pub struct Filesystem {
-    base_path: PathBuf,
+    storage_path: PathBuf,
     template_path: Option<PathBuf>,
+    total_size: Option<u64>,
     userspace_size: Option<u64>,
 }
 
 
+#[derive(Debug)]
 pub enum FSError {
     HFS(std::io::Error),
     PathBreaksOut,
-    InvalidUTF8Path
+    InvalidUTF8Path,
+    NotEnoughStorage
 }
 
 
-type FSRes<T> = Result<T, FSError>;
+impl std::fmt::Display for FSError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::HFS(hfs_err) => write!(f, "a host fs error occured: {hfs_err}"),
+            Self::PathBreaksOut => write!(f, "the path is invalid"),
+            Self::InvalidUTF8Path => write!(f, "the path is not valid a UTF-8 string"),
+            Self::NotEnoughStorage => write!(f, "you haven't got enough storage to store a file of such size"),
+        }
+    }
+}
+
+
+pub type FSRes<T> = Result<T, FSError>;
 
 
 impl Filesystem {
-    pub fn new(base_path: &Path, template_path: Option<&Path>, userspace_size: Option<u64>) -> Self {
+    pub fn new(storage_path: &Path, template_path: Option<&Path>, total_size: Option<u64>, userspace_size: Option<u64>) -> Self {
+        if !storage_path.exists() {
+            std::fs::create_dir(storage_path).unwrap()
+        } else if !storage_path.is_dir() {
+            panic!("filesystem's storage path must be a path to a directory")
+        };
+        
         Self {
-            userspace_size,
-            base_path: base_path.canonicalize().unwrap(),
-            template_path: template_path.map(|p| p.canonicalize().unwrap()),
+            userspace_size, total_size,
+            storage_path: storage_path.canonicalize().unwrap(),
+            template_path: template_path.map(|p| {
+                if !p.is_dir() {
+                    panic!("template path must be a path to an existing directory")
+                };
+
+                // todo remove such requirement
+                // todo check if p is under and relative to storage_path as well
+                
+                p.to_path_buf()
+            }),
         }
     }
     
-    pub fn base_path(&self) -> &Path {
-        &self.base_path
+    pub fn storage_path(&self) -> &Path {
+        &self.storage_path
     }
     
     pub fn template_path(&self) -> Option<&Path> {
@@ -41,9 +78,13 @@ impl Filesystem {
     pub fn userspace_size(&self) -> Option<u64> {
         self.userspace_size
     }
+    
+    pub fn total_size(&self) -> Option<u64> {
+        self.total_size
+    }
 
     pub async fn create_dir(&self, path: &Path) -> FSRes<()> {
-        tokio::fs::create_dir(self.construct_path(path).await?).await.map_err(FSError::HFS)?;
+        tokio::fs::create_dir(self.construct_path(path)?).await.map_err(FSError::HFS)?;
         Ok(())
     }
     
@@ -51,7 +92,7 @@ impl Filesystem {
         let mut files = Vec::new();
         let mut directories = Vec::new();
         
-        let mut dir_iter = tokio::fs::read_dir(self.construct_path(path).await?).await.map_err(FSError::HFS)?;
+        let mut dir_iter = tokio::fs::read_dir(self.construct_path(path)?).await.map_err(FSError::HFS)?;
         while let Some(item) = dir_iter.next_entry().await.map_err(FSError::HFS)? {
             let item_path = item.path();
             
@@ -66,12 +107,18 @@ impl Filesystem {
     }
     
     pub async fn write_file(&self, path: &Path, data: &[u8]) -> FSRes<()> {
-        tokio::fs::write(self.construct_path(path).await?, data).await.map_err(FSError::HFS)?;
+        if let Some(total_size) = self.total_size {
+            if self.get_item_size(&PathBuf::from_str(".").unwrap()).await? + data.len() as u64 > total_size {
+                return Err(FSError::NotEnoughStorage);
+            }
+        };
+        
+        tokio::fs::write(self.construct_path(path)?, data).await.map_err(FSError::HFS)?;
         Ok(())
     }
 
     pub async fn remove_item(&self, path: &Path) -> FSRes<()> {
-        let path = self.construct_path(path).await?;
+        let path = self.construct_path(path)?;
 
         if path.is_file() {
             tokio::fs::remove_file(path).await.map_err(FSError::HFS)?;
@@ -84,15 +131,22 @@ impl Filesystem {
 
     pub async fn move_item(&self, source: &Path, target: &Path) -> FSRes<()> {
         tokio::fs::rename(
-            self.construct_path(source).await?,
-            self.construct_path(target).await?
+            self.construct_path(source)?,
+            self.construct_path(target)?
         ).await.map_err(FSError::HFS)?;
         Ok(())
     }
 
     pub async fn copy_item(&self, source: &Path, target: &Path) -> FSRes<()> {
-        let source = self.construct_path(source).await?;
-        let target = self.construct_path(target).await?;
+        let source = self.construct_path(source)?;
+
+        if let Some(total_size) = self.total_size {
+            if self.get_item_size(&PathBuf::from_str(".").unwrap()).await? + self.get_item_size(&source).await? > total_size {
+                return Err(FSError::NotEnoughStorage);
+            }
+        };
+
+        let target = self.construct_path(target)?;
 
         if source.is_file() {
             tokio::fs::copy(source, target).await.map_err(FSError::HFS)?;
@@ -102,7 +156,7 @@ impl Filesystem {
             source.push("**");
             source.push("*");
 
-            let base_path = self.base_path.clone();  // xxx is there really not a better solution?
+            let base_path = self.storage_path.clone();  // xxx is there really not a better solution?
             tokio::task::spawn_blocking(move || {
                 for item in glob::glob(source.to_str().ok_or(FSError::InvalidUTF8Path)?).unwrap().filter_map(Result::ok) {
                     let target = target.join(item.strip_prefix(&base_path).unwrap());
@@ -127,11 +181,11 @@ impl Filesystem {
     }
 
     pub async fn read_file(&self, path: &Path) -> FSRes<Vec<u8>> {
-        tokio::fs::read(self.construct_path(path).await?).await.map_err(FSError::HFS)
+        tokio::fs::read(self.construct_path(path)?).await.map_err(FSError::HFS)
     }
 
     pub async fn get_item_size(&self, path: &Path) -> FSRes<u64> {
-        let path = self.construct_path(path).await?;
+        let path = self.construct_path(path)?;
 
         if path.is_file() {
             Ok(tokio::fs::metadata(path).await.map_err(FSError::HFS)?.len())
@@ -148,20 +202,27 @@ impl Filesystem {
             }).await.unwrap()
         }
     }
-    
-    pub async fn get_item_creation_time(&self, path: &Path) -> FSRes<SystemTime> { 
-        tokio::fs::metadata(self.construct_path(path).await?).await.map_err(FSError::HFS)?
-            .created().map_err(FSError::HFS)
+
+    /// returns: (created, modified)
+    pub async fn get_item_time_info(&self, path: &Path) -> FSRes<(SystemTime, SystemTime)> {  // xxx or should it be chrono::DateTime?
+        let metadata = self.get_item_metadata(&self.construct_path(path)?).await?;
+
+        Ok((
+            metadata.created().map_err(FSError::HFS)?,
+            metadata.modified().map_err(FSError::HFS)?
+        ))
     }
 
     pub async fn get_mime(&self, path: &Path) -> FSRes<Option<String>> {
-        Ok(mime_guess::from_path(self.construct_path(path).await?).first().map(|mm| mm.to_string()))
+        Ok(mime_guess::from_path(self.construct_path(path)?).first().map(|mm| mm.to_string()))
     }
     
-    pub async fn get_tree(&self, path: &Path) -> FSRes<Vec<PathBuf>> {
-        let mut path = self.construct_path(path).await?;
+    pub async fn get_dir_tree(&self, path: &Path) -> FSRes<Vec<PathBuf>> {
+        let mut path = self.construct_path(path)?;
+
         path.push("**");
         path.push("*");
+
         tokio::task::spawn_blocking(move || {
             Ok(glob::glob(path.to_str().ok_or(FSError::InvalidUTF8Path)?).unwrap()
                 .filter_map(|p| p.ok())
@@ -169,19 +230,23 @@ impl Filesystem {
         }).await.unwrap()
     }
 
-    async fn is_breaking_out(&self, path: &Path) -> FSRes<bool> {
-        let path = tokio::fs::canonicalize(path).await.map_err(FSError::HFS)?;
-
-        Ok(!path.starts_with(&self.base_path))
+    /// WARNING: EXPECTS AN ALREADY CONSTRUCTED PATH
+    pub fn is_breaking_out(&self, final_path: &Path) -> bool {
+        !final_path.starts_with(&self.storage_path)
     }
 
-    async fn construct_path(&self, path: &Path) -> FSRes<PathBuf> {
-        let c_path = self.base_path.join(path);
+    fn construct_path(&self, path: &Path) -> FSRes<PathBuf> {
+        let final_path = self.storage_path.join(path).normalize();
 
-        if self.is_breaking_out(&c_path).await? {
+        if self.is_breaking_out(&final_path) {
             return Err(FSError::PathBreaksOut)
         };
 
-        Ok(c_path)
+        Ok(final_path)
+    }
+
+    // xxx should it be public?
+    async fn get_item_metadata(&self, path: &Path) -> FSRes<Metadata> {
+        tokio::fs::metadata(self.construct_path(path)?).await.map_err(FSError::HFS)
     }
 }

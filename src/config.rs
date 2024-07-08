@@ -1,4 +1,5 @@
 use std::env::VarError;
+use std::path::PathBuf;
 use serde::Deserialize;
 
 #[derive(Debug, Deserialize)]
@@ -21,9 +22,19 @@ struct PartialAuthConfig {
 
 
 #[derive(Debug, Deserialize)]
+pub struct FilesystemConfig {
+    pub storage_path: PathBuf,
+    pub template_path: Option<PathBuf>,
+    pub total_size: Option<u64>,
+    pub user_space_size: Option<u64>,
+} 
+
+
+#[derive(Debug, Deserialize)]
 struct PartialConfig {
     pub name: String,
     pub server: ServerConfig,
+    pub filesystem: FilesystemConfig,
     pub database: PartialDBConfig,
     pub auth: PartialAuthConfig,
 }
@@ -47,6 +58,7 @@ pub struct DBConfig {
 pub struct Config {
     pub name: String,
     pub server: ServerConfig,
+    pub filesystem: FilesystemConfig,
     pub database: DBConfig,
     pub auth: AuthConfig,
 }
@@ -61,14 +73,15 @@ impl Config {
         let path = get_env_var(Self::CONFIG_FILE_PATH_ENV_VAR);
         
         let config_raw = std::fs::read_to_string(&path)
-            .expect(&format!("{path} should be a valid config file"));
+            .unwrap_or_else(|err| panic!("{path} should be a valid config file: {err}"));
 
         let part = toml::from_str::<PartialConfig>(&config_raw)
-            .expect(&format!("{path} should be a valid config file"));
+            .unwrap_or_else(|err| panic!("{path} should be a valid config file:\n{err}"));
 
         Self {
             name: part.name,
             server: part.server,
+            filesystem: part.filesystem,
             database: DBConfig {
                 path: get_env_var(Self::DATABASE_FILE_PATH_ENV_VAR),
                 conn_pool_size: part.database.conn_pool_size

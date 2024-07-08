@@ -5,17 +5,20 @@ mod middleware;
 mod filesystem;
 
 
+use std::path::PathBuf;
 use std::sync::Arc;
 use axum::extract::Request;
 use axum::ServiceExt;
 use tower::Layer;
 use config::Config;
+use filesystem::Filesystem;
 
 
 #[derive(Debug, Clone)]
 struct AppState {
     pub conn_pool: db::ConnPool,
     pub config: Arc<Config>,
+    pub filesystem: Arc<Filesystem>,
 }
 
 
@@ -31,10 +34,17 @@ async fn main() {
     
     db::migrate(&mut conn_pool.get().unwrap());
     
+    let filesystem = Filesystem::new(
+        &config.filesystem.storage_path, 
+        config.filesystem.template_path.as_ref().map(|p| p.as_path()),
+        config.filesystem.total_size,
+        config.filesystem.user_space_size
+    );
+    
     // todo remove this to string and then later from string conversion, while still supporting V4 and V6
     let addr = format!("{}:{}", config.server.address, config.server.port);
     
-    let state = AppState { conn_pool, config: Arc::new(config) };
+    let state = AppState { conn_pool, filesystem: Arc::new(filesystem), config: Arc::new(config) };
 
     let router = axum::Router::new()
         .nest("/v2", routers::v2::get_router())

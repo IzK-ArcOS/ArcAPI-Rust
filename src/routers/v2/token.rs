@@ -15,7 +15,7 @@ pub fn get_router() -> axum::Router<AppState> {
 
 
 async fn create_session(
-    State(AppState { conn_pool, config }): State<AppState>,
+    State(AppState { conn_pool, config, .. }): State<AppState>,
     TypedMultipart(NewSession { username, password }): TypedMultipart<NewSession>  // todo somehow make it support both multipart and form data
 ) -> Result<Json<Session>, StatusCode> {
     let token = tokio::task::spawn_blocking(move || {

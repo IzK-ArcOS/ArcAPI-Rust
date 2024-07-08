@@ -13,5 +13,5 @@ pub fn get_router() -> axum::Router<AppState> {
 async fn get_meta_info(
     State(AppState { config, .. }): State<AppState>
 ) -> Json<FlatDataResponse<MetaInfo>> {
-    Json(FlatDataResponse::new(MetaInfo::from(config.as_ref())))
+    Json(FlatDataResponse::new(MetaInfo::new(&config)))
 }

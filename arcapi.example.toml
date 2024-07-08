@@ -1,6 +1,14 @@
 # the name of the API for the API
 name = "Rust"
 
+[filesystem]
+storage_path = "fs"
+# if you want for each user to have some files on an acc creation, must be under and relative to storage_path
+#template_path = "template"
+# if you want to set a limit for the entire fs, just in case
+#total_size=68719476736  # 64 GiB
+user_space_size=1073741824
+
 [server]
 port = 3333
 address = "127.0.0.1"  # set to "0.0.0.0" if you want to expose the server

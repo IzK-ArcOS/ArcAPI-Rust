@@ -3,8 +3,8 @@ use crate::db;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct PartialUser {
-    username: Box<str>,
-    acc: serde_json::Value
+    pub username: String,
+    pub acc: serde_json::Value
 }
 
 
@@ -13,11 +13,8 @@ pub enum ConversionError {
 }
 
 
-
-impl TryFrom<db::User> for PartialUser {
-    type Error = ConversionError;
-
-    fn try_from(u: db::User) -> Result<Self, Self::Error> {
+impl PartialUser {
+    pub fn try_new(u: &db::User) -> Result<Self, ConversionError> {
         if u.is_deleted {
             return Err(ConversionError::ItemIsDeleted);
         };
@@ -26,11 +23,11 @@ impl TryFrom<db::User> for PartialUser {
             Err(_) => Err(ConversionError::ItemIsCorrupted(false)),
             Ok(mut json_prop) =>
                 Ok(Self {
-                    username: u.username.unwrap().into(),
+                    username: u.username.as_ref().unwrap().to_string(),
                     acc: json_prop.get_mut("acc")
                         .ok_or(ConversionError::ItemIsCorrupted(true))?
                         .take()
                 })
         }
-    }
+    } 
 }

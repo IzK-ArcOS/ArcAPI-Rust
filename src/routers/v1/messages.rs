@@ -53,7 +53,7 @@ async fn list_messages(
                                                             offset.unwrap_or(0));
         
         messages.into_iter().map(
-            |msg| MessagePreview::from_msg(conn, &msg, preview_length.unwrap_or(80) as usize)
+            |msg| MessagePreview::new(conn, &msg, preview_length.unwrap_or(80) as usize)
                 .expect("messages are not deleted, as we have filtered out the deleted once before")
         ).collect::<Vec<_>>()
     }).await.unwrap();
@@ -100,7 +100,7 @@ async fn send_message(
 
         let msg = db::Message::send(conn, &user, &target, None, &contents);
 
-        Ok(SentMessage::from_msg(conn, &msg))
+        Ok(SentMessage::new(conn, &msg))
     }).await.unwrap()?;
     
     Ok(Json(DataResponse::new(msg)))
@@ -131,7 +131,7 @@ async fn send_reply(
         
         let msg = db::Message::send(conn, &user, &target, Some(&reply), &contents);
 
-        Ok(SentMessage::from_msg(conn, &msg))
+        Ok(SentMessage::new(conn, &msg))
     }).await.unwrap()?;
 
     Ok(Json(DataResponse::new(msg)))
@@ -187,7 +187,7 @@ async fn get_message(
             let _ = msg.mark_as_read(conn);
         }
 
-        Ok(Message::from_msg(conn, &msg))
+        Ok(Message::new(conn, &msg))
     }).await.unwrap()?;
     
     Ok(Json(DataResponse::new(message)))
@@ -296,7 +296,7 @@ async fn get_thread(
             let mut thread_parts: HashMap<i32, Arc<Mutex<MessageThreadPart>>> = HashMap::new();
             let mut get_thread_part = |id: i32| {
                 thread_parts.entry(id).or_insert_with(|| Arc::new(Mutex::new(
-                    MessageThreadPart::from_msg_partially(
+                    MessageThreadPart::new_partial(
                         conn,
                         messages.get(&id)
                             .expect("all messages should have gotten cached"),

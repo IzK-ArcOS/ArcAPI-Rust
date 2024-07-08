@@ -15,11 +15,18 @@ pub enum B64ToStrError {
 }
 
 
+impl std::fmt::Display for B64ToStrError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Base64DecodingError(dec_err) => write!(f, "base64 decoding error: {dec_err}"),
+            Self::UTF8DecodingError(dec_err) => write!(f, "utf-8 decoding error: {dec_err}"),
+        }
+    }
+}
+
+
 impl IntoResponse for B64ToStrError {
     fn into_response(self) -> Response {
-        match self {
-            Self::Base64DecodingError(dec_err) => (StatusCode::BAD_REQUEST, format!("Base64 decoding error: {dec_err}")),
-            Self::UTF8DecodingError(dec_err) => (StatusCode::BAD_REQUEST, format!("UTF-8 decoding error: {dec_err}")),
-        }.into_response()
+        (StatusCode::BAD_REQUEST, self.to_string()).into_response()
     }
 }

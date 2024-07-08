@@ -89,6 +89,14 @@ impl User {
         self.is_deleted = true;
     }
     
+    pub fn get(conn: &mut SqliteConnection, id_: i32) -> Option<Self> {
+        users
+            .find(id_)
+            .get_result(conn)
+            .optional()
+            .unwrap()
+    }
+    
     pub fn get_by_username(conn: &mut SqliteConnection, username_: &str) -> Option<Self> {
         users
             .filter(username.eq(username_))

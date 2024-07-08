@@ -6,15 +6,15 @@ use crate::db;
 
 #[derive(Deserialize, Serialize)]
 pub struct MessagePreview {
-    id: i32,
-    sender: String,
-    receiver: String,
+    pub id: i32,
+    pub sender: String,
+    pub receiver: String,
     #[serde(rename = "replyingTo")]
-    replying_to: Option<i32>,
-    timestamp: u64,
+    pub replying_to: Option<i32>,
+    pub timestamp: u64,
     #[serde(rename = "partialBody")]
-    partial_body: String,
-    read: bool
+    pub partial_body: String,
+    pub read: bool
 }
 
 
@@ -25,7 +25,7 @@ pub enum ConversionError {
 
 
 impl MessagePreview {
-    pub fn from_msg(conn: &mut SqliteConnection, message: &db::Message, preview_length: usize) -> Result<Self, ConversionError> {
+    pub fn new(conn: &mut SqliteConnection, message: &db::Message, preview_length: usize) -> Result<Self, ConversionError> {
         Ok(Self {
             id: message.id,
             sender: message.get_sender(conn).get_username(),
@@ -42,15 +42,15 @@ impl MessagePreview {
 #[serde_with::skip_serializing_none]
 #[derive(Deserialize, Serialize)]
 pub struct SentMessage {
-    id: i32,
-    sender: String,
-    receiver: String,
-    replier: Option<i32>
+    pub id: i32,
+    pub sender: String,
+    pub receiver: String,
+    pub replier: Option<i32>
 }
 
 
 impl SentMessage {
-    pub fn from_msg(conn: &mut SqliteConnection, message: &db::Message) -> Self {
+    pub fn new(conn: &mut SqliteConnection, message: &db::Message) -> Self {
         Self {
             id: message.id,
             sender: message.get_sender(conn).get_username(),
@@ -63,20 +63,20 @@ impl SentMessage {
 
 #[derive(Deserialize, Serialize)]
 pub struct Message {
-    id: i32,
-    sender: String,
-    receiver: String,
-    body: String,
-    replies: Vec<i32>,
+    pub id: i32,
+    pub sender: String,
+    pub receiver: String,
+    pub body: String,
+    pub replies: Vec<i32>,
     #[serde(rename = "replyingTo")]
-    replying_to: Option<i32>,
-    timestamp: u64,
-    read: bool
+    pub replying_to: Option<i32>,
+    pub timestamp: u64,
+    pub read: bool
 }
 
 
 impl Message {
-    pub fn from_msg(conn: &mut SqliteConnection, message: &db::Message) -> Self {
+    pub fn new(conn: &mut SqliteConnection, message: &db::Message) -> Self {
         Self {
             id: message.id,
             sender: message.get_sender(conn).get_username(),
@@ -93,20 +93,20 @@ impl Message {
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct MessageThreadPart {
-    id: i32,
-    sender: String,
-    receiver: String,
+    pub id: i32,
+    pub sender: String,
+    pub receiver: String,
     #[serde(rename = "partialBody")]
-    partial_body: String,
+    pub partial_body: String,
     pub replies: Vec<Arc<Mutex<MessageThreadPart>>>,
     #[serde(rename = "replyingTo")]
-    replying_to: Option<i32>,
-    timestamp: u64,
+    pub replying_to: Option<i32>,
+    pub timestamp: u64,
 }
 
 
 impl MessageThreadPart {
-    pub fn from_msg_partially(conn: &mut SqliteConnection, message: &db::Message, preview_length: usize) -> Self {
+    pub fn new_partial(conn: &mut SqliteConnection, message: &db::Message, preview_length: usize) -> Self {
         Self {
             id: message.id,
             sender: message.get_sender(conn).get_username(),

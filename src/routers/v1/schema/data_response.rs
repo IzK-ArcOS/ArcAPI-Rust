@@ -2,10 +2,10 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct DataResponse<T> {
-    data: T,
-    valid: bool,
+    pub data: T,
+    pub valid: bool,
     #[serde(rename = "statusCode")]
-    status_code: i32
+    pub status_code: i32
 }
 
 

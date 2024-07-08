@@ -18,7 +18,7 @@ pub fn get_router() -> axum::Router<AppState> {
 
 
 async fn create_session(
-    State(AppState { conn_pool, config }): State<AppState>,
+    State(AppState { conn_pool, config, .. }): State<AppState>,
     TypedHeader(basic_creds): TypedHeader<Authorization<Basic>>
 ) -> Result<Json<DataResponse<Session>>, StatusCode> {
     let session = tokio::task::spawn_blocking(move || {
@@ -29,7 +29,7 @@ async fn create_session(
                                     basic_creds.password(), 
                                     config.auth.session_lifetime.map(Duration::from_secs));
         
-        token.map(|t| Session::from_token(conn, t))
+        token.map(|t| Session::new(conn, t))
     }).await.unwrap();
 
     match session {

@@ -3,16 +3,16 @@ use crate::config::Config;
 
 #[derive(Serialize, Deserialize)]
 pub struct MetaInfo {
-    platform: String,
-    port: u16,
-    referrer: String,
-    revision: u32,
-    protected: bool,
+    pub platform: String,
+    pub port: u16,
+    pub referrer: String,
+    pub revision: u32,
+    pub protected: bool,
 }
 
 
-impl From<&Config> for MetaInfo {
-    fn from(cfg: &Config) -> Self {
+impl MetaInfo {
+    pub fn new(cfg: &Config) -> Self {
         Self {
             platform: cfg.name.clone(),
             port: cfg.server.port,
