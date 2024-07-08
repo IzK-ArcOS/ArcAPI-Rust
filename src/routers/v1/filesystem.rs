@@ -1,3 +1,4 @@
+use std::io::ErrorKind;
 use std::path::PathBuf;
 use std::str::FromStr;
 use axum::extract::{Query, State};
@@ -36,10 +37,16 @@ enum FSInteractionError {
 impl IntoResponse for FSInteractionError {
     fn into_response(self) -> Response {
         match self {
-            // fixme actually custom-handle some of the fs errors (specify )
-            Self::FS(fs_error) => (StatusCode::BAD_REQUEST, format!("fs error: {fs_error}")).into_response(),
-            Self::B64Decoding(dec_error) => (StatusCode::BAD_REQUEST, format!("path decoding error: {dec_error}")).into_response(),
-        }
+            Self::FS(err @ FSError::NotEnoughStorage) => (StatusCode::PAYLOAD_TOO_LARGE, err.to_string()),
+            Self::FS(err @ (FSError::InvalidUTF8Path | FSError::PathBreaksOut)) => (StatusCode::BAD_REQUEST, err.to_string()),
+            Self::FS(FSError::HFS(hfs_err)) =>
+                match hfs_err.kind() {
+                    ErrorKind::NotFound => (StatusCode::NOT_FOUND, "item at such path does not exist".to_string()),
+                    ErrorKind::AlreadyExists => (StatusCode::CONFLICT, "item at such path already exists".to_string()),
+                    _ => (StatusCode::INTERNAL_SERVER_ERROR, format!("unhandled host fs error: {hfs_err}"))
+                }
+            Self::B64Decoding(dec_error) => (StatusCode::BAD_REQUEST, format!("path decoding error: {dec_error}")),
+        }.into_response()
     }
 }
 
