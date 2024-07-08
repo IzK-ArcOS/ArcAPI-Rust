@@ -1,9 +1,13 @@
+use std::io::ErrorKind;
+use std::path::PathBuf;
+use std::str::FromStr;
 use axum::extract::State;
 use axum::http::StatusCode;
 use axum::Json;
 use axum::response::{IntoResponse, Response};
 use axum::routing::{get, post};
 use crate::{AppState, db};
+use crate::filesystem::{FSError, UserScopedFS};
 use crate::routers::extractors::SessionUser;
 use super::schema::{NewUser, SelfUser};
 
@@ -42,14 +46,21 @@ async fn create_new_user(
 
 
 async fn delete_self(
-    State(AppState { conn_pool, .. }): State<AppState>,
+    State(AppState { conn_pool, filesystem, .. }): State<AppState>,
     SessionUser(mut user): SessionUser,
 ) {
+    let usfs = UserScopedFS::new(&filesystem, user.id).await.unwrap();  // i hope this doesnt ever fail
+    
     tokio::task::spawn_blocking(move || {
         let conn = &mut conn_pool.get().unwrap();
         
         user.delete(conn);
     }).await.unwrap();
+    
+    match usfs.remove_item(&PathBuf::from_str(".").unwrap()).await {
+        Err(FSError::HFS(err)) if err.kind() == ErrorKind::NotFound => {},
+        whatever => whatever.unwrap()   // i really hope this doesnt fail under most other circumstances as well
+    }
 }
 
 
